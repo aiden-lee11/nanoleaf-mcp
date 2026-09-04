@@ -102,3 +102,31 @@ def fish(geo: Geo, loop_s: float = 10.0):
             return hsb(185, 30, 95)
         return hsb(205 - 15 * p.v, 90 - 20 * p.v, 22 + 40 * p.v)
     return fn, loop_s
+
+
+@scene("sailboat", "Sailboat", "A boat sets sail left to right over blue water: dark hull on the waves, a white sail above it, a foamy wake behind, sun in the sky.",
+       tags=("story", "water", "multi"), params={"loop_s": 12.0}, param_docs={"loop_s": "seconds for one crossing"})
+def sailboat(geo: Geo, loop_s: float = 12.0):
+    water_rows = 1 if geo.nrows <= 3 else 2
+    v_hull = (water_rows - 1) / max(1, geo.nrows - 1) if geo.nrows > 1 else 0.0
+    v_sail = water_rows / max(1, geo.nrows - 1) if geo.nrows > 1 else 0.0
+    top_row = geo.nrows - 1
+
+    def fn(t: float, p: Panel):
+        u = (t / loop_s) % 1.2 - 0.1
+        hull = geo.nearest(u, v_hull)
+        sail = geo.nearest(u, v_sail) if geo.nrows > 1 else None
+        if p is hull:
+            return (95, 52, 20)
+        if sail is not None and p is sail and sail.row > hull.row:
+            return (248, 248, 255)
+        if p is geo.nearest(u - 0.07, v_hull) and p.row < water_rows:
+            return (170, 220, 255)
+        if p is geo.nearest(u - 0.14, v_hull) and p.row < water_rows:
+            return (100, 170, 235)
+        if p.row < water_rows or geo.nrows == 1:
+            return hsb(210, 90, 42 + 18 * math.sin(2 * math.pi * t / 3.0 + p.u * 9))
+        if p.row == top_row and p.col >= geo.ncols - 2:
+            return hsb(45, 90, 100)
+        return hsb(205, 55 - 10 * p.v, 80 + 15 * p.v)
+    return fn, loop_s

@@ -110,3 +110,43 @@ def rain(geo: Geo, loop_s: float = 4.0):
             return hsb(210, 90, 70 * (1 - (d - 0.12) / 0.28))
         return hsb(220, 90, 5)
     return fn, loop_s
+
+
+@scene("gunshot", "Gunshot", "Muzzle flash at the left, a tracer round races left to right along the top and hits the right end with a burst; smoke lingers at the muzzle. Best across two controllers.",
+       tags=("motion", "action", "multi"), params={"period_s": 4.0, "travel_s": 0.6},
+       param_docs={"period_s": "seconds between shots", "travel_s": "seconds for the round to cross"})
+def gunshot(geo: Geo, period_s: float = 4.0, travel_s: float = 0.6):
+    from . import H
+    v_top = 1.0 if geo.nrows > 1 else 0.0
+    t_hit = 0.05 + travel_s
+    width_rows = geo.w / H
+
+    def fn(t: float, p: Panel):
+        lt = t % period_s
+        if lt < 0.12 and p.u < 0.1:                                     # muzzle flash
+            return (255, 240, 180) if lt < 0.06 else (255, 160, 40)
+        if 0.05 <= lt < t_hit:                                          # tracer with a hot tail
+            bu = (lt - 0.05) / travel_s
+            if p is geo.nearest(bu, v_top):
+                return (255, 255, 220)
+            if p is geo.nearest(bu - 0.06, v_top) and bu > 0.06:
+                return (255, 200, 80)
+            if p is geo.nearest(bu - 0.12, v_top) and bu > 0.12:
+                return (200, 90, 20)
+        if t_hit <= lt < t_hit + 0.5:                                   # impact burst spreading from the right edge
+            f = (lt - t_hit) / 0.5
+            d = (1.0 - p.u) * width_rows
+            r = 0.5 + 3.5 * f
+            if d < r:
+                k = min(1.0, d / r)
+                base = hsb(40 - 35 * k, 90 + 10 * k, 100 * (1 - f) ** 0.7)
+                return base
+        if 0.12 <= lt < 2.4 and p.u < 0.14:                             # smoke drifting up at the muzzle
+            f = (lt - 0.12) / 2.3
+            lift = 0.6 + 0.4 * p.v
+            return hsb(0, 0, max(0.0, 42 * (1 - f) * lift))
+        if t_hit + 0.5 <= lt < t_hit + 2.0 and p.u > 0.9:               # embers at the impact
+            f = (lt - t_hit - 0.5) / 1.5
+            return hsb(12, 100, 45 * (1 - f))
+        return hsb(230, 40, 3)
+    return fn, period_s

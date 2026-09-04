@@ -648,9 +648,9 @@ class Nanoleaf:
             res["replaced_showing"] = True
         elif c.selected_effect() != before.get("effect"):
             prev = before.get("effect") or ""
-            if prev and not prev.startswith("*"):
-                self.restore(dev, c, before)
-                res["restored"] = prev
+            if before.get("colorMode") in ("ct", "hs") or (prev and not prev.startswith("*")):
+                self.restore(dev, c, before)          # a saved effect, a solid colour or a white temperature
+                res["restored"] = prev if not prev.startswith("*") else before.get("colorMode")
             else:
                 c.set_state(on=before.get("on"))
                 res["warning"] = f"the controller switched to {name!r}; the previous unsaved display ({prev}) cannot be restored"

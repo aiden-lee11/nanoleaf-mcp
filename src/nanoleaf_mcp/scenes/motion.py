@@ -112,17 +112,18 @@ def rain(geo: Geo, loop_s: float = 4.0):
     return fn, loop_s
 
 
-@scene("gunshot", "Gunshot", "A handgun drawn on the far left (a two-by-two grip with a barrel along the bottom row) fires to the right: recoil on the grip, flash at the muzzle, a tracer round crossing to the right end where it bursts, smoke drifting up. Best across two controllers.",
-       tags=("motion", "action", "multi"), params={"period_s": 4.0, "travel_s": 0.6, "barrel_len": 2},
-       param_docs={"period_s": "seconds between shots", "travel_s": "seconds for the round to cross", "barrel_len": "barrel panels beyond the grip along the bottom row"})
-def gunshot(geo: Geo, period_s: float = 4.0, travel_s: float = 0.6, barrel_len: int = 2):
+@scene("gunshot", "Gunshot", "A handgun drawn on the far left (grip at the back, barrel along the top row) fires to the right: recoil on the grip, flash at the muzzle, a tracer round crossing to the right end where it bursts, smoke rising where there is room. Best across two controllers.",
+       tags=("motion", "action", "multi"), params={"period_s": 4.0, "travel_s": 0.6, "barrel_len": 3},
+       param_docs={"period_s": "seconds between shots", "travel_s": "seconds for the round to cross", "barrel_len": "barrel cells beyond the grip along the top row"})
+def gunshot(geo: Geo, period_s: float = 4.0, travel_s: float = 0.6, barrel_len: int = 3):
     from . import H
     first = geo.devices[0]
-    handle_rows = min(2, geo.nrows)
-    grip = [geo.by_cell[(r, c)].key for r in range(handle_rows) for c in range(2)
+    top = geo.nrows - 1
+    grip_rows = range(max(0, top - (2 if geo.nrows >= 3 else 1)), top + 1)      # the grip hangs below the barrel
+    grip = [geo.by_cell[(r, c)].key for r in grip_rows for c in range(2)
             if (r, c) in geo.by_cell and geo.by_cell[(r, c)].device == first]
-    barrel = [geo.by_cell[(0, c)].key for c in range(2, 2 + barrel_len)
-              if (0, c) in geo.by_cell and geo.by_cell[(0, c)].device == first]
+    barrel = [geo.by_cell[(top, c)].key for c in range(2, 2 + barrel_len)          # barrel along the top row
+              if (top, c) in geo.by_cell and geo.by_cell[(top, c)].device == first]
     gun = set(grip) | set(barrel)
     muzzle = geo.by_key[(barrel or grip)[-1]]
     v_line = muzzle.v
@@ -167,8 +168,8 @@ def gunshot(geo: Geo, period_s: float = 4.0, travel_s: float = 0.6, barrel_len: 
                 return hsb(40 - 35 * k, 90 + 10 * k, 100 * (1 - f) ** 0.7)
         if t_hit + 0.5 <= lt < t_hit + 2.0 and p.u > 0.9:
             return hsb(12, 100, 45 * (1 - (lt - t_hit - 0.5) / 1.5))
-        # smoke curling up from the muzzle
-        if 0.1 <= lt < 2.4 and p.device == first and p.row > 0 and abs(p.u - u_muzzle) < 0.16:
+        # smoke curling up from the muzzle (only where there is a row above the barrel)
+        if 0.1 <= lt < 2.4 and p.device == first and p.row > muzzle.row and abs(p.u - u_muzzle) < 0.16:
             f = (lt - 0.1) / 2.3
             return hsb(0, 0, max(0.0, 40 * (1 - f) * (0.6 + 0.4 * p.v)))
         return hsb(230, 40, 3)

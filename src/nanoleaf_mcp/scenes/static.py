@@ -33,3 +33,46 @@ def spectrum_facets(geo: Geo, colors=("#ff00ff", "#ff0000", "#ffaa00", "#00ff40"
         dim = 1.0 if p.up else 0.7
         return (int(r * dim), int(g * dim), int(b * dim))
     return fn, 0.0
+
+
+@scene("stained_glass", "Stained Glass", "Jewel-toned panes with the panel gaps as lead lines. 'rose' radiates rings from the centre; 'mosaic' colours the panes so no neighbours match. Slow sunlight drifts across the glass.",
+       tags=("design", "ambient"), loop=True,
+       params={"style": "rose", "colors": ["#c8102e", "#0033a0", "#f5b800", "#00843d", "#6a1b9a", "#ff6f00", "#00a3e0"],
+               "sunlight": True, "period_s": 24.0, "segments": 6},
+       param_docs={"style": "rose | mosaic", "colors": "pane colours (jewel tones work best)", "sunlight": "animate light drifting across",
+                   "period_s": "seconds for the sunlight to cross", "segments": "rose window: wedges around the centre"})
+def stained_glass(geo: Geo, style: str = "rose", colors=("#c8102e", "#0033a0", "#f5b800", "#00843d", "#6a1b9a", "#ff6f00", "#00a3e0"),
+                  sunlight: bool = True, period_s: float = 24.0, segments: int = 6):
+    import math
+    from . import H
+    panes = [to_rgb(c) for c in colors]
+    n = len(panes)
+    cx, cy = (geo.x0 + geo.x1) / 2, (geo.y0 + geo.y1) / 2
+    assign: dict[tuple[str, int], int] = {}
+    if style == "mosaic":                                  # greedy graph colouring: neighbours never match
+        adj = geo.adjacency
+        order = sorted(geo.panels, key=lambda p: (-len(adj[p.key]), p.x, p.y))
+        used = [0] * n
+        for p in order:
+            taken = {assign[k] for k in adj[p.key] if k in assign}
+            free = [i for i in range(n) if i not in taken] or list(range(n))
+            i = min(free, key=lambda i: (used[i], (i * 7 + p.id) % n))
+            assign[p.key] = i; used[i] += 1
+    else:                                                  # rose window: rings x wedges, gold boss in the centre
+        for p in geo.panels:
+            d = math.hypot(p.x - cx, p.y - cy)
+            ring = int(d / (H * 0.9))
+            wedge = int(((math.atan2(p.y - cy, p.x - cx) + math.pi) / (2 * math.pi)) * segments) % max(1, segments)
+            assign[p.key] = 2 if ring == 0 and d < H * 0.6 else (ring * 2 + (wedge % 2)) % n   # two colours per ring
+    thickness = {p.key: 0.78 + 0.22 * (((p.id * 2654435761) % 1000) / 1000) for p in geo.panels}
+
+    def fn(t: float, p: Panel):
+        r, g, b = panes[assign[p.key]]
+        light = thickness[p.key] * (1.0 if p.up else 0.86)
+        if sunlight:
+            su = (t / period_s) % 1.3 - 0.15                # a soft beam crossing left to right
+            beam = math.exp(-((p.u - su) / 0.22) ** 2)
+            clouds = 0.5 + 0.5 * math.sin(2 * math.pi * t / (period_s * 1.7) + p.u * 2)
+            light *= 0.55 + 0.45 * (0.6 * beam + 0.4 * clouds)
+        return (int(r * light), int(g * light), int(b * light))
+    return fn, period_s * 1.7 * 10 if sunlight else 1.0   # sunlight loops when both cycles realign

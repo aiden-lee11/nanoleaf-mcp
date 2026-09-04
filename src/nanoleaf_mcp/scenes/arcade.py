@@ -232,7 +232,10 @@ def tetris(geo: Geo, seed: int = 5, fall_s: float = 0.3):
     dt = 0.05
     rng = random.Random(seed)
     W, Hh = geo.ncols, geo.nrows
-    shapes = [[(0, 0), (0, 1), (0, 2)], [(0, 0), (0, 1), (1, 0)], [(0, 0), (0, 1), (1, 1)], [(0, 0), (1, 0)], [(0, 0), (0, 1)], [(0, 0), (0, 1), (0, 2), (0, 3)]]
+    # short boards get flat pieces only (overhangs kill a 3-4 row board in seconds); taller boards get real shapes
+    shapes = [[(0, 0)], [(0, 0), (0, 1)], [(0, 0), (0, 1)], [(0, 0), (0, 1), (0, 2)], [(0, 0), (0, 1), (0, 2)]]
+    if geo.nrows >= 5:
+        shapes += [[(0, 0), (1, 0)], [(0, 0), (0, 1), (1, 0)], [(0, 0), (0, 1), (1, 1)], [(0, 0), (0, 1), (0, 2), (0, 3)], [(0, 0), (0, 1), (1, 0), (1, 1)]]
     colours = [hsb(190, 90, 100), hsb(50, 95, 100), hsb(280, 80, 95), hsb(120, 80, 90), hsb(0, 90, 95), hsb(30, 95, 100), hsb(220, 90, 100)]
     state = {"stack": {}, "piece": None, "next_fall": 0.0, "clear": None, "over": None}
 
@@ -272,13 +275,28 @@ def tetris(geo: Geo, seed: int = 5, fall_s: float = 0.3):
             frame = dict(s["stack"])
         if s["piece"] is None:
             pc = new_piece()
-            for _ in range(W):                                   # slide sideways to a column where it fits
-                if fits(pc, pc["row"]):
-                    break
-                pc["col"] = (pc["col"] + 1) % max(1, W - (max(c for _, c in pc["cells"])))
-            else:
+            # choose the column like a player would: complete rows if possible, otherwise keep the stack low
+            w = max(c for _, c in pc["cells"]) + 1
+            best, best_score = None, None
+            for col in range(0, max(1, W - w + 1)):
+                cand = dict(pc, col=col)
+                if not fits(cand, cand["row"]):
+                    continue
+                row = cand["row"]
+                while row > 0 and fits(cand, row - 1):
+                    row -= 1
+                placed = set(s["stack"]) | set(cells_of(cand, row))
+                complete = sum(1 for r in range(Hh) if all((r, c) in placed for c in range(W) if (r, c) in geo.cells))
+                landing = max(r for r, _ in cells_of(cand, row))
+                holes = sum(1 for (r, c) in cells_of(cand, row) if r > 0 and (r - 1, c) in geo.cells and (r - 1, c) not in placed)
+                lowest = min((r for r in range(Hh) if any((r, c) in geo.cells and (r, c) not in placed for c in range(W))), default=Hh)
+                fill = sum(1 for c in range(W) if (lowest, c) in placed) if lowest < Hh else 0
+                score = complete * 30 - landing * 6 - holes * 8 + fill * 1.0 + rng.random() * 0.3
+                if best_score is None or score > best_score:
+                    best, best_score = cand, score
+            if best is None:
                 s["over"] = t; return frame
-            s["piece"] = pc; s["next_fall"] = t + fall_s
+            s["piece"] = best; s["next_fall"] = t + fall_s
         pc = s["piece"]
         if t >= s["next_fall"]:
             if fits(pc, pc["row"] - 1):
@@ -351,3 +369,97 @@ def mario(geo: Geo, speed: float = 2.5):
 
     frames = _precompute(loop, dt, step)
     return _player(frames, dt, loop, lambda t, p: hsb(205, 60, 60 + 20 * p.v)), loop
+
+
+# ---------------------------------------------------------------- bricks and balls --------------------------
+@scene("bricks_balls", "Bricks and Balls", "The mobile brick-breaker: numbered bricks creep down a row each turn, a stream of balls fired from the bottom ricochets off the walls chipping them down (colour = hits left) until they shatter; lose when a brick reaches the floor.",
+       tags=("game", "mobile"), params={"seed": 6, "balls": 6}, param_docs={"balls": "balls per volley"}, min_rows=3)
+def bricks_balls(geo: Geo, seed: int = 6, balls: int = 6):
+    dt = 0.05
+    rng = random.Random(seed)
+    W, Hh = geo.ncols, geo.nrows
+    from . import H
+    rows_w, rows_h = geo.w / H, geo.h / H
+    level = {"n": 1}
+    state = {"bricks": {}, "balls": [], "phase": "aim", "phase_t": 0.0, "launch_u": 0.5, "angle": 1.2, "fired": 0,
+             "flash": {}, "over": None}
+
+    def durability_colour(hits):
+        return [hsb(200, 85, 90), hsb(130, 80, 85), hsb(55, 95, 100), hsb(30, 100, 100), hsb(0, 95, 95)][min(4, hits - 1)]
+
+    def new_row():
+        row = {}
+        density = 0.55 if Hh >= 4 else 0.35
+        for c in range(W):
+            if (Hh - 1, c) in geo.cells and rng.random() < density:
+                row[(Hh - 1, c)] = rng.randint(1, min(5, 1 + level["n"]) if Hh >= 4 else min(3, 1 + level["n"] // 2))
+        return row
+
+    def descend():
+        moved = {}
+        for (r, c), hits in state["bricks"].items():
+            moved[(r - 1, c)] = hits
+        state["bricks"] = moved
+        state["bricks"].update(new_row())
+        level["n"] += 1
+
+    state["bricks"] = new_row(); descend()
+
+    def cell(u, v):
+        p = geo.nearest(max(0.0, min(1.0, u)), max(0.0, min(1.0, v)))
+        return (p.row, p.col)
+
+    def step(t):
+        s = state
+        frame = {}
+        if s["over"] is not None:
+            if t - s["over"] > 1.5:
+                s.update(bricks={}, balls=[], phase="aim", phase_t=t, over=None); level["n"] = 1
+                s["bricks"] = new_row(); descend()
+            elif int((t - s["over"]) / 0.2) % 2 == 0:
+                return {c: (255, 80, 80) for c in geo.cells}
+        for c, hits in s["bricks"].items():
+            if c in geo.cells: frame[c] = durability_colour(hits)
+        for c, t0 in list(s["flash"].items()):
+            if t - t0 < 0.15: frame[c] = (255, 255, 255)
+            else: del s["flash"][c]
+        if s["phase"] == "aim":
+            if t - s["phase_t"] > 0.6:
+                targets = [(c, h) for c, h in s["bricks"].items() if c in geo.cells]
+                if targets:
+                    tc = max(targets, key=lambda ch: ch[1] * 10 - ch[0][0])[0]
+                    tu, tv = tc[1] / max(1, W - 1), tc[0] / max(1, Hh - 1)
+                    s["angle"] = math.atan2(max(0.2, tv - 0.0), (tu - s["launch_u"]) + rng.uniform(-0.15, 0.15))
+                s["phase"], s["phase_t"], s["fired"], s["balls"] = "fire", t, 0, []
+        if s["phase"] == "fire":
+            if s["fired"] < balls and t - s["phase_t"] >= s["fired"] * 0.12:
+                s["balls"].append({"u": s["launch_u"], "v": 0.02, "du": math.cos(s["angle"]) * 0.9, "dv": math.sin(s["angle"]) * 0.9, "home": False})
+                s["fired"] += 1
+            for b in s["balls"]:
+                if b["home"]: continue
+                b["u"] += b["du"] * dt; b["v"] += b["dv"] * dt
+                if b["u"] < 0: b["u"], b["du"] = -b["u"], abs(b["du"])
+                if b["u"] > 1: b["u"], b["du"] = 2 - b["u"], -abs(b["du"])
+                if b["v"] > 1: b["v"], b["dv"] = 2 - b["v"], -abs(b["dv"])
+                bc = cell(b["u"], b["v"])
+                if bc in s["bricks"]:
+                    s["bricks"][bc] -= 1; s["flash"][bc] = t
+                    if s["bricks"][bc] <= 0: del s["bricks"][bc]
+                    b["dv"] = -b["dv"]; b["v"] += b["dv"] * dt * 2
+                if b["v"] <= 0:
+                    b["home"] = True; b["v"] = 0.0
+            if s["fired"] >= balls and all(b["home"] for b in s["balls"]):
+                s["launch_u"] = s["balls"][0]["u"] if s["balls"] else 0.5
+                descend()
+                if any(r <= 0 for (r, _) in s["bricks"]):
+                    s["over"] = t
+                s["phase"], s["phase_t"] = "aim", t
+        for b in s["balls"]:
+            if not b["home"]:
+                frame[cell(b["u"], b["v"])] = (255, 255, 255)
+        frame[cell(s["launch_u"], 0.0)] = (120, 230, 255)
+        return frame
+
+    loop = 30.0
+    frames = _precompute(loop, dt, step)
+    return _player(frames, dt, loop, lambda t, p: hsb(230, 40, 4)), loop

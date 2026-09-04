@@ -194,3 +194,54 @@ def space_shooter(geo: Geo, loop_s: float = 12.0):
             return colours[tag]
         return hsb(230, 40, 9 if ((t * 0.3 + p.id * 0.41) % 1.0) < 0.05 else 2)
     return fn, loop_s
+
+
+@scene("pacman", "Pac-Man", "Pac-Man chomps along a corridor of pellets through the panel maze, a red ghost fleeing ahead and a pink one chasing; a blinking power pellet turns the ghost blue so it can be eaten. Level-clear flash, then again.",
+       tags=("game", "retro", "multi"), params={"step_s": 0.3, "seed": 3},
+       param_docs={"step_s": "seconds per move", "seed": "which corridor is used when several exist"})
+def pacman(geo: Geo, step_s: float = 0.3, seed: int = 3):
+    routes = _snake_routes(geo)
+    route = routes[seed % len(routes)]
+    idx = {k: i for i, k in enumerate(route)}
+    n = len(route)
+    power = max(2, int(n * 0.55))
+    lead, chase = 4, 3
+    catch = power + lead                       # where the blue ghost gets eaten
+    steps = n + 2
+    play = steps * step_s
+    CLEAR, PAUSE = 1.6, 0.6
+    loop = play + CLEAR + PAUSE
+    WALL, PELLET, EATEN = hsb(230, 90, 14), hsb(40, 30, 55), hsb(230, 80, 5)
+    PAC, PAC_OPEN = (255, 220, 0), (160, 130, 0)
+    RED, PINK, BLUE, EYES = (255, 40, 40), (255, 130, 200), (40, 60, 255), (230, 230, 255)
+
+    def fn(t: float, p: Panel):
+        lt = t % loop
+        if p.key not in idx:
+            if lt >= play and lt < play + CLEAR and int((lt - play) / 0.25) % 2 == 0:
+                return (200, 210, 255)
+            return WALL
+        i = idx[p.key]
+        if lt >= play:
+            if lt < play + CLEAR and int((lt - play) / 0.25) % 2 == 0:
+                return (200, 210, 255)
+            return EATEN
+        k = int(lt / step_s)
+        head = min(n - 1, k)
+        powered = head >= power
+        red_i = min(n - 1, head + lead) if not powered else catch
+        pink_i = head - chase
+        if i == head:
+            return PAC_OPEN if k % 2 else PAC
+        if i == red_i and head < catch:
+            return BLUE if powered and int(lt / 0.2) % 4 != 3 else RED
+        if i == red_i and head == catch:
+            return EYES
+        if i == pink_i and i >= 0:
+            return PINK
+        if i > head:
+            if i == power:
+                return (255, 255, 255) if int(lt / 0.25) % 2 == 0 else PELLET
+            return PELLET
+        return EATEN
+    return fn, loop

@@ -14,6 +14,7 @@ import logging
 import os
 import shutil
 import subprocess
+import time
 from typing import Any
 
 import httpx
@@ -72,26 +73,38 @@ class NanoleafClient:
             raise NanoleafError("Device is not paired (no auth token). Run pairing first.", 401)
         return f"{self.base}/{self.token}{path}"
 
-    def request(self, method: str, path: str, body: Any = None, *, auth: bool = True) -> Any:
+    def request(self, method: str, path: str, body: Any = None, *, auth: bool = True, retries: int = 3) -> Any:
+        """Controllers stall for a few seconds after mode changes (entering/leaving streaming, adding effects);
+        a timed-out request is retried with a short back-off before giving up."""
         url = self._url(path, auth)
         data = json.dumps(body) if body is not None else None
-        if self.backend == "curl":
-            status, text = self._curl(method, url, data)
-        else:
+        for attempt in range(retries):
             try:
-                r = self._http.request(method, url, content=data,
-                                       headers={"Content-Type": "application/json"} if data else None)
-                status, text = r.status_code, r.text
-            except (httpx.TransportError, OSError) as e:
-                if self.backend == "auto" and _is_ehostunreach(e) and shutil.which("curl"):
-                    if not self._warned:
-                        log.warning(LOCAL_NETWORK_HINT)
-                        self._warned = True
-                    self.backend = "curl"
+                if self.backend == "curl":
                     status, text = self._curl(method, url, data)
                 else:
-                    raise NanoleafError(f"{method} {path} failed: {e}") from e
-        return self._handle(method, path, status, text)
+                    try:
+                        r = self._http.request(method, url, content=data,
+                                               headers={"Content-Type": "application/json"} if data else None)
+                        status, text = r.status_code, r.text
+                    except (httpx.TransportError, OSError) as e:
+                        if self.backend == "auto" and _is_ehostunreach(e) and shutil.which("curl"):
+                            if not self._warned:
+                                log.warning(LOCAL_NETWORK_HINT)
+                                self._warned = True
+                            self.backend = "curl"
+                            status, text = self._curl(method, url, data)
+                        elif isinstance(e, httpx.TimeoutException):
+                            raise NanoleafError(f"{method} {path} timed out", None, "timeout") from e
+                        else:
+                            raise NanoleafError(f"{method} {path} failed: {e}") from e
+                return self._handle(method, path, status, text)
+            except NanoleafError as e:
+                timed_out = e.body == "timeout" or "timed out" in str(e)
+                if not timed_out or attempt == retries - 1:
+                    raise
+                log.warning("%s %s timed out (controller busy); retrying in %ds", method, path, 2 * (attempt + 1))
+                time.sleep(2 * (attempt + 1))
 
     def _curl(self, method: str, url: str, data: str | None) -> tuple[int, str]:
         cmd = ["curl", "-sS", "-m", str(self.timeout), "-X", method, "-o", "-", "-w", "\n__STATUS__%{http_code}", url]

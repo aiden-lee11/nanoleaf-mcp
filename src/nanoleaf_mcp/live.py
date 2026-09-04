@@ -8,10 +8,14 @@ from __future__ import annotations
 import threading
 import time
 
-from .client import NanoleafClient
+import logging
+
+from .client import NanoleafClient, NanoleafError
 from .config import Device
 from .scenes import Geo, SceneFn, to_rgb
 from .stream import Streamer
+
+log = logging.getLogger("nanoleaf")
 
 
 class LiveShow:
@@ -29,8 +33,17 @@ class LiveShow:
     def run(self, duration_s: float | None = None) -> dict:
         streams = {d.key: Streamer(self.clients[d.key]) for d in self.devices}
         for d in self.devices:
-            streams[d.key].start()
-            self.clients[d.key].set_state(on=True)
+            # controllers can stall for a few seconds right after a mode change; retry rather than abort the show
+            for attempt in range(4):
+                try:
+                    self.clients[d.key].set_state(on=True)
+                    streams[d.key].start()
+                    break
+                except NanoleafError as e:
+                    if attempt == 3:
+                        raise
+                    log.warning("%s not ready (%s); retrying", d.label, e)
+                    time.sleep(1.5 * (attempt + 1))
         period = 1.0 / self.fps
         t0 = time.perf_counter()
         next_tick = t0

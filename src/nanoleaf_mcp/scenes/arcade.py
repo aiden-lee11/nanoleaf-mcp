@@ -463,3 +463,165 @@ def bricks_balls(geo: Geo, seed: int = 6, balls: int = 6):
     loop = 30.0
     frames = _precompute(loop, dt, step)
     return _player(frames, dt, loop, lambda t, p: hsb(230, 40, 4)), loop
+
+
+# ---------------------------------------------------------------- fruit ninja -------------------------------
+@scene("fruit_ninja", "Fruit Ninja", "Fruit tossed up in arcs from the bottom; a white blade streak slices each at the top of its arc, the halves fly apart and juice splashes; a bomb now and then sails through untouched.",
+       tags=("game", "mobile"), params={"seed": 7}, min_rows=3)
+def fruit_ninja(geo: Geo, seed: int = 7):
+    dt = 0.05
+    rng = random.Random(seed)
+    from . import H
+    rows_w, rows_h = geo.w / H, geo.h / H
+    FRUITS = [((40, 200, 60), (255, 60, 80)), ((255, 140, 0), (255, 190, 60)), ((255, 220, 40), (255, 240, 150)),
+              ((220, 30, 40), (255, 120, 120)), ((120, 200, 40), (180, 240, 90)), ((160, 40, 200), (210, 130, 240))]
+    state = {"items": [], "next": 0.6, "streaks": [], "splats": [], "halves": []}
+    g = -1.4
+
+    def step(t):
+        s = state
+        frame = {}
+        if t >= s["next"]:
+            n = rng.choice([1, 1, 2])
+            for _ in range(n):
+                bomb = rng.random() < 0.15
+                u = rng.uniform(0.15, 0.85)
+                apex = rng.uniform(0.6, 0.95)
+                dv = math.sqrt(2 * -g * apex)
+                s["items"].append({"u": u, "v": 0.0, "du": rng.uniform(-0.12, 0.12), "dv": dv, "bomb": bomb,
+                                   "fruit": rng.choice(FRUITS), "sliced": False, "born": t})
+            s["next"] = t + rng.uniform(1.1, 1.8)
+        for it in list(s["items"]):
+            it["u"] += it["du"] * dt; it["v"] += it["dv"] * dt; it["dv"] += g * dt
+            if it["v"] < -0.05:
+                s["items"].remove(it); continue
+            if not it["bomb"] and not it["sliced"] and it["dv"] <= 0.05 and it["v"] > 0.3:
+                it["sliced"] = True
+                ang = rng.uniform(0.5, 1.2) * rng.choice([-1, 1])
+                s["streaks"].append((it["u"], it["v"], ang, t))
+                skin, flesh = it["fruit"]
+                for d in (-1, 1):
+                    s["halves"].append({"u": it["u"], "v": it["v"], "du": d * 0.35 + it["du"], "dv": 0.25, "colour": flesh})
+                s["splats"].append((it["u"], it["v"], flesh, t))
+                s["items"].remove(it)
+        for h in list(s["halves"]):
+            h["u"] += h["du"] * dt; h["v"] += h["dv"] * dt; h["dv"] += g * dt
+            if h["v"] < -0.05: s["halves"].remove(h)
+        # draw: splats first (fading), then streaks, then flying things
+        for (u, v, colour, t0) in list(s["splats"]):
+            if t - t0 > 0.6:
+                s["splats"].remove((u, v, colour, t0)); continue
+            f = (t - t0) / 0.6
+            for p in geo.panels:
+                if math.hypot((p.u - u) * rows_w, (p.v - v) * rows_h) < 1.1:
+                    frame[(p.row, p.col)] = tuple(int(c * (1 - f) * 0.7) for c in colour)
+        for (u, v, ang, t0) in list(s["streaks"]):
+            if t - t0 > 0.15:
+                s["streaks"].remove((u, v, ang, t0)); continue
+            for k in (-1.2, -0.6, 0, 0.6, 1.2):
+                p = geo.nearest(u + math.cos(ang) * k / rows_w, v + math.sin(ang) * k / rows_h)
+                frame[(p.row, p.col)] = (255, 255, 255)
+        for h in s["halves"]:
+            if 0 <= h["u"] <= 1 and 0 <= h["v"] <= 1:
+                p = geo.nearest(h["u"], h["v"]); frame[(p.row, p.col)] = h["colour"]
+        for it in s["items"]:
+            if 0 <= it["u"] <= 1 and 0 <= it["v"] <= 1:
+                p = geo.nearest(it["u"], it["v"])
+                if it["bomb"]:
+                    frame[(p.row, p.col)] = (255, 60, 30) if int(t / 0.12) % 3 == 0 else (60, 60, 70)
+                else:
+                    frame[(p.row, p.col)] = it["fruit"][0]
+        return frame
+
+    loop = 24.0
+    frames = _precompute(loop, dt, step)
+    return _player(frames, dt, loop, lambda t, p: hsb(30, 40, 6)), loop
+
+
+# ---------------------------------------------------------------- suika -------------------------------------
+@scene("suika", "Suika Game", "The watermelon game: fruit drop into the box and settle; two of the same kind touching merge into the next fruit with a pop, cherry up to watermelon. Overflow the box and it resets.",
+       tags=("game", "mobile"), params={"seed": 8, "drop_s": 0.9}, param_docs={"drop_s": "seconds between drops"}, min_rows=3)
+def suika(geo: Geo, seed: int = 8, drop_s: float = 0.9):
+    dt = 0.05
+    rng = random.Random(seed)
+    W, Hh = geo.ncols, geo.nrows
+    LEVELS = [hsb(350, 90, 75), hsb(0, 95, 100), hsb(275, 70, 85), hsb(30, 100, 100), hsb(18, 90, 90), hsb(5, 85, 95),
+              hsb(80, 60, 90), hsb(20, 50, 100), hsb(50, 95, 100), hsb(100, 60, 85), hsb(120, 85, 60)]
+    adj_cells = {}
+    for p in geo.panels:
+        adj_cells[(p.row, p.col)] = [(geo.by_key[k].row, geo.by_key[k].col) for k in geo.adjacency[p.key] if k[0] == p.device]
+    state = {"fruit": {}, "falling": None, "next_drop": 0.5, "pops": {}, "over": None, "fall_t": 0.0}
+
+    def below(cell):
+        r, c = cell
+        for cand in ((r - 1, c), (r - 1, c - 1), (r - 1, c + 1)):
+            if cand in geo.cells and cand not in state["fruit"]:
+                return cand
+        return None
+
+    def settle():
+        moved = True
+        while moved:
+            moved = False
+            for cell in sorted(state["fruit"], key=lambda c: c[0]):
+                lvl = state["fruit"][cell]
+                b = below(cell)
+                if b is not None:
+                    del state["fruit"][cell]; state["fruit"][b] = lvl; moved = True
+
+    def merges(t):
+        changed = True
+        while changed:
+            changed = False
+            for cell in sorted(state["fruit"], key=lambda c: c[0]):
+                lvl = state["fruit"].get(cell)
+                if lvl is None: continue
+                for nb in adj_cells.get(cell, []):
+                    if state["fruit"].get(nb) == lvl and lvl < len(LEVELS) - 1:
+                        low, high = (cell, nb) if cell[0] <= nb[0] else (nb, cell)
+                        del state["fruit"][high]; state["fruit"][low] = lvl + 1
+                        state["pops"][low] = t; changed = True
+                        break
+                if changed:
+                    settle(); break
+
+    def step(t):
+        s = state
+        frame = {}
+        if s["over"] is not None:
+            if t - s["over"] > 1.5:
+                s.update(fruit={}, falling=None, over=None, next_drop=t + 0.5)
+            elif int((t - s["over"]) / 0.2) % 2 == 0:
+                return {c: (255, 255, 255) for c in geo.cells}
+        for cell, lvl in s["fruit"].items():
+            frame[cell] = LEVELS[lvl]
+        for cell, t0 in list(s["pops"].items()):
+            if t - t0 < 0.2: frame[cell] = (255, 255, 255)
+            else: del s["pops"][cell]
+        if s["falling"] is None and t >= s["next_drop"] and s["over"] is None:
+            cols = [c for c in range(W) if (Hh - 1, c) in geo.cells and (Hh - 1, c) not in s["fruit"]]
+            if not cols:
+                s["over"] = t; return frame
+            s["falling"] = {"cell": (Hh - 1, rng.choice(cols)), "lvl": rng.choice([0, 0, 1, 1, 2]), "t": t}
+        if s["falling"] is not None:
+            f = s["falling"]
+            if t - f["t"] >= 0.12:
+                nxt = None
+                r, c = f["cell"]
+                for cand in ((r - 1, c), (r - 1, c - 1), (r - 1, c + 1)):
+                    if cand in geo.cells and cand not in s["fruit"]:
+                        nxt = cand; break
+                if nxt is None:
+                    s["fruit"][f["cell"]] = f["lvl"]; s["falling"] = None
+                    merges(t)
+                    s["next_drop"] = t + drop_s
+                    if any(r >= Hh - 1 for (r, _) in s["fruit"]) and len(s["fruit"]) > W:
+                        s["over"] = t
+                    return {**frame, **{cell: LEVELS[l] for cell, l in s["fruit"].items()}}
+                f["cell"], f["t"] = nxt, t
+            frame[f["cell"]] = LEVELS[f["lvl"]]
+        return frame
+
+    loop = 40.0
+    frames = _precompute(loop, dt, step)
+    return _player(frames, dt, loop, lambda t, p: hsb(40, 50, 8)), loop

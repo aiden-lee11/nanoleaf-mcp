@@ -385,7 +385,7 @@ def bricks_balls(geo: Geo, seed: int = 6, balls: int = 6):
              "flash": {}, "over": None}
 
     def durability_colour(hits):                  # grey bricks: the more hits left, the brighter
-        return hsb(220, 8, [30, 45, 60, 78, 95][min(4, hits - 1)])
+        return hsb(215, 35, [32, 46, 62, 78, 94][min(4, hits - 1)])
 
     def new_row():
         row = {}

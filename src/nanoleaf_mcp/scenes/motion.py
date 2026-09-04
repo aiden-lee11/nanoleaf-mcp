@@ -112,41 +112,64 @@ def rain(geo: Geo, loop_s: float = 4.0):
     return fn, loop_s
 
 
-@scene("gunshot", "Gunshot", "Muzzle flash at the left, a tracer round races left to right along the top and hits the right end with a burst; smoke lingers at the muzzle. Best across two controllers.",
-       tags=("motion", "action", "multi"), params={"period_s": 4.0, "travel_s": 0.6},
-       param_docs={"period_s": "seconds between shots", "travel_s": "seconds for the round to cross"})
-def gunshot(geo: Geo, period_s: float = 4.0, travel_s: float = 0.6):
+@scene("gunshot", "Gunshot", "A handgun drawn on the far left (a two-by-two grip with a barrel along the bottom row) fires to the right: recoil on the grip, flash at the muzzle, a tracer round crossing to the right end where it bursts, smoke drifting up. Best across two controllers.",
+       tags=("motion", "action", "multi"), params={"period_s": 4.0, "travel_s": 0.6, "barrel_len": 2},
+       param_docs={"period_s": "seconds between shots", "travel_s": "seconds for the round to cross", "barrel_len": "barrel panels beyond the grip along the bottom row"})
+def gunshot(geo: Geo, period_s: float = 4.0, travel_s: float = 0.6, barrel_len: int = 2):
     from . import H
-    v_top = 1.0 if geo.nrows > 1 else 0.0
+    first = geo.devices[0]
+    handle_rows = min(2, geo.nrows)
+    grip = [geo.by_cell[(r, c)].key for r in range(handle_rows) for c in range(2)
+            if (r, c) in geo.by_cell and geo.by_cell[(r, c)].device == first]
+    barrel = [geo.by_cell[(0, c)].key for c in range(2, 2 + barrel_len)
+              if (0, c) in geo.by_cell and geo.by_cell[(0, c)].device == first]
+    gun = set(grip) | set(barrel)
+    muzzle = geo.by_key[(barrel or grip)[-1]]
+    v_line = muzzle.v
+    u_muzzle = muzzle.u
     t_hit = 0.05 + travel_s
     width_rows = geo.w / H
+    GRIP, SLIDE, MUZZLE_TIP = (78, 48, 26), (96, 102, 112), (120, 126, 138)
 
     def fn(t: float, p: Panel):
         lt = t % period_s
-        if lt < 0.12 and p.u < 0.1:                                     # muzzle flash
-            return (255, 240, 180) if lt < 0.06 else (255, 160, 40)
-        if 0.05 <= lt < t_hit:                                          # tracer with a hot tail
-            bu = (lt - 0.05) / travel_s
-            if p is geo.nearest(bu, v_top):
+        # the gun itself, always lit; the grip kicks back bright on the shot, the tip glows hot afterwards
+        if p.key in gun:
+            if lt < 0.12 and p.key in grip:
+                return (150, 100, 60)
+            if p is muzzle:
+                if lt < 0.08:
+                    return (255, 245, 190)
+                if lt < 1.2:
+                    f = (lt - 0.08) / 1.12
+                    return (int(MUZZLE_TIP[0] + (255 - MUZZLE_TIP[0]) * (1 - f) * 0.6), int(MUZZLE_TIP[1] + 60 * (1 - f)), int(MUZZLE_TIP[2]))
+                return MUZZLE_TIP
+            return GRIP if p.key in grip else SLIDE
+        # muzzle flash just in front of the barrel
+        if lt < 0.1 and p is geo.nearest(u_muzzle + 0.06, v_line):
+            return (255, 240, 170) if lt < 0.05 else (255, 150, 30)
+        # tracer from the muzzle to the right edge, with a hot two-panel tail
+        if 0.05 <= lt < t_hit:
+            bu = u_muzzle + (1.0 - u_muzzle) * (lt - 0.05) / travel_s
+            if p is geo.nearest(bu, v_line):
                 return (255, 255, 220)
-            if p is geo.nearest(bu - 0.06, v_top) and bu > 0.06:
+            if p is geo.nearest(bu - 0.05, v_line) and bu - 0.05 > u_muzzle:
                 return (255, 200, 80)
-            if p is geo.nearest(bu - 0.12, v_top) and bu > 0.12:
-                return (200, 90, 20)
-        if t_hit <= lt < t_hit + 0.5:                                   # impact burst spreading from the right edge
+            if p is geo.nearest(bu - 0.10, v_line) and bu - 0.10 > u_muzzle:
+                return (190, 80, 20)
+        # impact burst spreading back from the right edge
+        if t_hit <= lt < t_hit + 0.5:
             f = (lt - t_hit) / 0.5
             d = (1.0 - p.u) * width_rows
             r = 0.5 + 3.5 * f
             if d < r:
                 k = min(1.0, d / r)
-                base = hsb(40 - 35 * k, 90 + 10 * k, 100 * (1 - f) ** 0.7)
-                return base
-        if 0.12 <= lt < 2.4 and p.u < 0.14:                             # smoke drifting up at the muzzle
-            f = (lt - 0.12) / 2.3
-            lift = 0.6 + 0.4 * p.v
-            return hsb(0, 0, max(0.0, 42 * (1 - f) * lift))
-        if t_hit + 0.5 <= lt < t_hit + 2.0 and p.u > 0.9:               # embers at the impact
-            f = (lt - t_hit - 0.5) / 1.5
-            return hsb(12, 100, 45 * (1 - f))
+                return hsb(40 - 35 * k, 90 + 10 * k, 100 * (1 - f) ** 0.7)
+        if t_hit + 0.5 <= lt < t_hit + 2.0 and p.u > 0.9:
+            return hsb(12, 100, 45 * (1 - (lt - t_hit - 0.5) / 1.5))
+        # smoke curling up from the muzzle
+        if 0.1 <= lt < 2.4 and p.device == first and p.row > 0 and abs(p.u - u_muzzle) < 0.16:
+            f = (lt - 0.1) / 2.3
+            return hsb(0, 0, max(0.0, 40 * (1 - f) * (0.6 + 0.4 * p.v)))
         return hsb(230, 40, 3)
     return fn, period_s

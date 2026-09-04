@@ -372,7 +372,7 @@ def mario(geo: Geo, speed: float = 2.5):
 
 
 # ---------------------------------------------------------------- bricks and balls --------------------------
-@scene("bricks_balls", "Bricks and Balls", "The mobile brick-breaker: numbered bricks creep down a row each turn, a stream of balls fired from the bottom ricochets off the walls chipping them down (colour = hits left) until they shatter; lose when a brick reaches the floor.",
+@scene("bricks_balls", "Bricks and Balls", "The mobile brick-breaker: grey bricks (brighter = more hits left) creep down a row each turn, a stream of red balls fired from the bottom ricochets off the walls chipping them down until they shatter; lose when a brick reaches the floor.",
        tags=("game", "mobile"), params={"seed": 6, "balls": 6}, param_docs={"balls": "balls per volley"}, min_rows=3)
 def bricks_balls(geo: Geo, seed: int = 6, balls: int = 6):
     dt = 0.05
@@ -384,8 +384,8 @@ def bricks_balls(geo: Geo, seed: int = 6, balls: int = 6):
     state = {"bricks": {}, "balls": [], "phase": "aim", "phase_t": 0.0, "launch_u": 0.5, "angle": 1.2, "fired": 0,
              "flash": {}, "over": None}
 
-    def durability_colour(hits):
-        return [hsb(200, 85, 90), hsb(130, 80, 85), hsb(55, 95, 100), hsb(30, 100, 100), hsb(0, 95, 95)][min(4, hits - 1)]
+    def durability_colour(hits):                  # grey bricks: the more hits left, the brighter
+        return hsb(220, 8, [30, 45, 60, 78, 95][min(4, hits - 1)])
 
     def new_row():
         row = {}
@@ -421,7 +421,7 @@ def bricks_balls(geo: Geo, seed: int = 6, balls: int = 6):
         for c, hits in s["bricks"].items():
             if c in geo.cells: frame[c] = durability_colour(hits)
         for c, t0 in list(s["flash"].items()):
-            if t - t0 < 0.15: frame[c] = (255, 255, 255)
+            if t - t0 < 0.15: frame[c] = (255, 200, 200)
             else: del s["flash"][c]
         if s["phase"] == "aim":
             if t - s["phase_t"] > 0.6:
@@ -456,8 +456,8 @@ def bricks_balls(geo: Geo, seed: int = 6, balls: int = 6):
                 s["phase"], s["phase_t"] = "aim", t
         for b in s["balls"]:
             if not b["home"]:
-                frame[cell(b["u"], b["v"])] = (255, 255, 255)
-        frame[cell(s["launch_u"], 0.0)] = (120, 230, 255)
+                frame[cell(b["u"], b["v"])] = (255, 40, 40)
+        frame[cell(s["launch_u"], 0.0)] = (160, 20, 20)
         return frame
 
     loop = 30.0

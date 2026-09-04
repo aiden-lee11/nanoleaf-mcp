@@ -1,0 +1,463 @@
+{
+ "source": "requestPlugins on Nanoleaf Light Panels NL22 firmware 5.2.2 (2026-09-03)",
+ "plugins": [
+  {
+   "uuid": "713518c1-d560-47db-8991-de780af71d1e",
+   "name": "Burst",
+   "type": "color",
+   "description": "Your palette colors radiate out from the center of the panels.",
+   "tags": [
+    "chill",
+    "zen"
+   ],
+   "features": [
+    "touch"
+   ],
+   "options": [
+    {
+     "name": "loop",
+     "type": "bool",
+     "default": true,
+     "min": null,
+     "max": null,
+     "values": null
+    },
+    {
+     "name": "transTime",
+     "type": "int",
+     "default": 24,
+     "min": 1,
+     "max": 600,
+     "values": null
+    },
+    {
+     "name": "delayTime",
+     "type": "int",
+     "default": 0,
+     "min": 0,
+     "max": 600,
+     "values": null
+    }
+   ]
+  },
+  {
+   "uuid": "b3fd723a-aae8-4c99-bf2b-087159e0ef53",
+   "name": "Fade",
+   "type": "color",
+   "description": "The Light Panels cycle through your palette colors all together.",
+   "tags": [
+    "chill",
+    "zen"
+   ],
+   "features": [],
+   "options": [
+    {
+     "name": "loop",
+     "type": "bool",
+     "default": true,
+     "min": null,
+     "max": null,
+     "values": null
+    },
+    {
+     "name": "transTime",
+     "type": "int",
+     "default": 24,
+     "min": 1,
+     "max": 600,
+     "values": null
+    },
+    {
+     "name": "delayTime",
+     "type": "int",
+     "default": 0,
+     "min": 0,
+     "max": 600,
+     "values": null
+    }
+   ]
+  },
+  {
+   "uuid": "027842e4-e1d6-4a4c-a731-be74a1ebd4cf",
+   "name": "Flow",
+   "type": "color",
+   "description": "Imagine you dump each color onto your panels. Watch the color flow in a direction of your choosing.",
+   "tags": [
+    "zen",
+    "happy"
+   ],
+   "features": [],
+   "options": [
+    {
+     "name": "loop",
+     "type": "bool",
+     "default": true,
+     "min": null,
+     "max": null,
+     "values": null
+    },
+    {
+     "name": "transTime",
+     "type": "int",
+     "default": 24,
+     "min": 1,
+     "max": 600,
+     "values": null
+    },
+    {
+     "name": "delayTime",
+     "type": "int",
+     "default": 0,
+     "min": 0,
+     "max": 600,
+     "values": null
+    },
+    {
+     "name": "linDirection",
+     "type": "string",
+     "default": "right",
+     "min": null,
+     "max": null,
+     "values": [
+      "left",
+      "right",
+      "up",
+      "down"
+     ]
+    }
+   ]
+  },
+  {
+   "uuid": "70b7c636-6bf8-491f-89c1-f4103508d642",
+   "name": "Highlight",
+   "type": "color",
+   "description": "Just like random, but you will mostly see the first color of your palette. The other colors fade in periodically.",
+   "tags": [
+    "chill",
+    "zen"
+   ],
+   "features": [
+    "touch"
+   ],
+   "options": [
+    {
+     "name": "transTime",
+     "type": "int",
+     "default": 24,
+     "min": 1,
+     "max": 600,
+     "values": null
+    },
+    {
+     "name": "delayTime",
+     "type": "int",
+     "default": 15,
+     "min": 0,
+     "max": 600,
+     "values": null
+    },
+    {
+     "name": "mainColorProb",
+     "type": "double",
+     "default": 80.0,
+     "min": 0.0,
+     "max": 100.0,
+     "values": null
+    }
+   ]
+  },
+  {
+   "uuid": "ba632d3e-9c2b-4413-a965-510c839b3f71",
+   "name": "Random",
+   "type": "color",
+   "description": "This will take your palette colors and randomly animate them across your panels.",
+   "tags": [
+    "party",
+    "happy"
+   ],
+   "features": [],
+   "options": [
+    {
+     "name": "transTime",
+     "type": "int",
+     "default": 24,
+     "min": 1,
+     "max": 600,
+     "values": null
+    },
+    {
+     "name": "delayTime",
+     "type": "int",
+     "default": 0,
+     "min": 0,
+     "max": 600,
+     "values": null
+    }
+   ]
+  },
+  {
+   "uuid": "ac8fb29a-333d-4de8-a95e-211cecc31ae1",
+   "name": "Weave",
+   "type": "color",
+   "description": "A weaving checkerboard that intertwines your palette, dynamically flowing from one end of your layout to the other.",
+   "tags": [
+    "happy",
+    "bright",
+    "vibrant"
+   ],
+   "features": [],
+   "options": [
+    {
+     "name": "loop",
+     "type": "bool",
+     "default": true,
+     "min": null,
+     "max": null,
+     "values": null
+    },
+    {
+     "name": "transTime",
+     "type": "int",
+     "default": 24,
+     "min": 1,
+     "max": 600,
+     "values": null
+    },
+    {
+     "name": "delayTime",
+     "type": "int",
+     "default": 0,
+     "min": 0,
+     "max": 600,
+     "values": null
+    },
+    {
+     "name": "linDirection",
+     "type": "string",
+     "default": "right",
+     "min": null,
+     "max": null,
+     "values": [
+      "left",
+      "right",
+      "up",
+      "down"
+     ]
+    }
+   ]
+  },
+  {
+   "uuid": "6970681a-20b5-4c5e-8813-bdaebc4ee4fa",
+   "name": "Wheel",
+   "type": "color",
+   "description": "Provides a continuous moving gradient of color created from your palette.",
+   "tags": [
+    "party",
+    "chill",
+    "zen"
+   ],
+   "features": [],
+   "options": [
+    {
+     "name": "loop",
+     "type": "bool",
+     "default": true,
+     "min": null,
+     "max": null,
+     "values": null
+    },
+    {
+     "name": "transTime",
+     "type": "int",
+     "default": 24,
+     "min": 1,
+     "max": 600,
+     "values": null
+    },
+    {
+     "name": "nColorsPerFrame",
+     "type": "int",
+     "default": 2,
+     "min": 2,
+     "max": 50,
+     "values": null
+    },
+    {
+     "name": "linDirection",
+     "type": "string",
+     "default": "right",
+     "min": null,
+     "max": null,
+     "values": [
+      "left",
+      "right",
+      "up",
+      "down"
+     ]
+    }
+   ]
+  },
+  {
+   "uuid": "6f3c6267-2644-4086-b175-d0a8b00078d3",
+   "name": "Windmill",
+   "type": "color",
+   "description": "A windmill powered by the colors of your palette, spinning along with each varying shade.",
+   "tags": [
+    "chill",
+    "cool"
+   ],
+   "features": [],
+   "options": [
+    {
+     "name": "loop",
+     "type": "bool",
+     "default": true,
+     "min": null,
+     "max": null,
+     "values": null
+    },
+    {
+     "name": "transTime",
+     "type": "int",
+     "default": 24,
+     "min": 1,
+     "max": 600,
+     "values": null
+    },
+    {
+     "name": "delayTime",
+     "type": "int",
+     "default": 0,
+     "min": 0,
+     "max": 600,
+     "values": null
+    }
+   ]
+  },
+  {
+   "uuid": "5cec763a-6f32-45cf-a691-b81e176b6b4a",
+   "name": "Fireworks",
+   "type": "rhythm",
+   "description": "This could be your very own mini EDM festival. In this musical fireworks display, explosions of color from your palette are set off to the bass of the song.",
+   "tags": [
+    "happy",
+    "electronic",
+    "party",
+    "vibrant",
+    "pop"
+   ],
+   "features": [],
+   "options": []
+  },
+  {
+   "uuid": "23e70ff4-458c-4852-826f-9315d89ee6ed",
+   "name": "Meteor Shower",
+   "type": "rhythm",
+   "description": "Like a meteor shower of music notes, watch as a stardust of colors sprinkle across the panels to the pitch of the music. Colors on the left indicate low notes while the right represents higher notes.",
+   "tags": [
+    "party",
+    "electronic",
+    "vibrant",
+    "pop"
+   ],
+   "features": [],
+   "options": []
+  },
+  {
+   "uuid": "30018343-7587-4152-8d97-1c349ccc3e68",
+   "name": "Paint Splatter",
+   "type": "rhythm",
+   "description": "Like paint splatters on a wall, random circular clusters of panels will show blots of color alternating to the beat of the music. The colors are taken from your palette, and randomly selected to correspond to the varying pitches in the song.",
+   "tags": [
+    "vibrant",
+    "happy",
+    "classical",
+    "pop",
+    "acoustic"
+   ],
+   "features": [],
+   "options": []
+  },
+  {
+   "uuid": "60333927-cc36-4a5a-a682-9bd114de8bff",
+   "name": "Pulse Pop Beats",
+   "type": "rhythm",
+   "description": "Designed for vocals and slow jams. Increased flux in the song will trigger pops of color on the panels, and a pulse of colors with fluctuation in the tone of the song.",
+   "tags": [
+    "electronic",
+    "rap",
+    "classical"
+   ],
+   "features": [],
+   "options": []
+  },
+  {
+   "uuid": "29e48ce5-fcf1-4943-b73f-fad1c09701f3",
+   "name": "Rhythmic Northern Lights",
+   "type": "rhythm",
+   "description": "Watch as colors from your palette drop onto the panels and slowly diffuse outwards, mixing with other hues based on the music's changing pitch and beat.",
+   "tags": [
+    "vibrant",
+    "jazz",
+    "pop",
+    "chill"
+   ],
+   "features": [],
+   "options": []
+  },
+  {
+   "uuid": "bc6fe7e0-36d4-4f95-aa21-52a386daa9dc",
+   "name": "Ripple",
+   "type": "rhythm",
+   "description": "Wisps of color dance across the display, creating a majestic ripple effect outwards based on the music's intensity.",
+   "tags": [
+    "chill",
+    "pop",
+    "vibrant",
+    "accoustic"
+   ],
+   "features": [],
+   "options": []
+  },
+  {
+   "uuid": "7c15b20a-aa00-4c37-82c5-8fe8b1625516",
+   "name": "Shooting Stars",
+   "type": "rhythm",
+   "description": "Like stars shooting across the night sky, your colors will shoot across the Aurora to match the music's changing pitch and beat.",
+   "tags": [
+    "vibrant",
+    "pop"
+   ],
+   "features": [],
+   "options": []
+  },
+  {
+   "uuid": "fe0d0ba8-741f-4210-940c-454eceed010f",
+   "name": "Sound Bar",
+   "type": "rhythm",
+   "description": "Two of your favorite colors compete in a dance-off to the intensity of music. The length of your setup will determine the direction the soundbar will go. Works best for softer music.",
+   "tags": [
+    "ambient",
+    "acoustic",
+    "classical",
+    "vocal",
+    "chill"
+   ],
+   "features": [],
+   "options": []
+  },
+  {
+   "uuid": "337784c0-6c98-447a-8a9f-fc6ac44a8024",
+   "name": "Streaking Notes",
+   "type": "rhythm",
+   "description": "Each color of your palette is assigned from low notes to high notes. When that note plays, you'll see that color shoot across your panels",
+   "tags": [
+    "pop",
+    "party",
+    "electronic"
+   ],
+   "features": [],
+   "options": []
+  }
+ ]
+}

@@ -51,7 +51,7 @@ def _is_ehostunreach(exc: BaseException) -> bool:
 
 class NanoleafClient:
     def __init__(self, ip: str, port: int = 16021, token: str | None = None,
-                 timeout: float = 6.0, backend: str | None = None):
+                 timeout: float = 4.0, backend: str | None = None):
         self.ip = ip
         self.port = port
         self.token = token
@@ -73,7 +73,7 @@ class NanoleafClient:
             raise NanoleafError("Device is not paired (no auth token). Run pairing first.", 401)
         return f"{self.base}/{self.token}{path}"
 
-    def request(self, method: str, path: str, body: Any = None, *, auth: bool = True, retries: int = 3) -> Any:
+    def request(self, method: str, path: str, body: Any = None, *, auth: bool = True, retries: int = 6) -> Any:
         """Controllers stall for a few seconds after mode changes (entering/leaving streaming, adding effects);
         a timed-out request is retried with a short back-off before giving up."""
         url = self._url(path, auth)
@@ -103,8 +103,9 @@ class NanoleafClient:
                 timed_out = e.body == "timeout" or "timed out" in str(e)
                 if not timed_out or attempt == retries - 1:
                     raise
-                log.warning("%s %s timed out (controller busy); retrying in %ds", method, path, 2 * (attempt + 1))
-                time.sleep(2 * (attempt + 1))
+                wait = 1.5 * (attempt + 1)
+                log.warning("%s %s timed out (controller busy); retrying in %.0fs", method, path, wait)
+                time.sleep(wait)
 
     def _curl(self, method: str, url: str, data: str | None) -> tuple[int, str]:
         cmd = ["curl", "-sS", "-m", str(self.timeout), "-X", method, "-o", "-", "-w", "\n__STATUS__%{http_code}", url]

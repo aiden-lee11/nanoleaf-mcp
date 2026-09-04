@@ -198,14 +198,17 @@ def main(argv: list[str] | None = None) -> int:
             print(f"wrote {a.out} ({len(html) // 1024} KB); open it in a browser")
         elif a.cmd == "listen":
             from .sound import ClapConfig, ClapDetector
-            dev, c = nl.one(d)
-            body, dur = nl.one_shot_body(c, a.effect)
-            nl.show_idle(dev.label, a.effect)
+            devs = nl.targets(d)
+            bodies = {dev.label: nl.one_shot_body(nl.client(dev), a.effect) for dev in devs}
+            for dev in devs:
+                nl.show_idle(dev.label, a.effect)
+            dur = max(b[1] for b in bodies.values())
             cfg = ClapConfig(sensitivity_db=a.sensitivity, min_db=a.min_db, cooldown_s=max(a.cooldown, dur + 1), input=a.input)
-            print(f"listening for a clap -> {body['animName']!r} on {dev.label} ({dur:.1f}s). Ctrl-C to stop.", flush=True)
+            print(f"listening for a clap -> {a.effect!r} on {', '.join(bodies)} ({dur:.1f}s). Ctrl-C to stop.", flush=True)
             def fire(db):
                 print(f"{time.strftime('%H:%M:%S')} clap at {db:.0f} dBFS -> playing", flush=True)
-                c.display_effect(body); c.set_state(on=True)
+                res = nl.sync_play({label: a.effect for label in bodies}, bodies)
+                print(f"  started on {len(res['devices'])} device(s), spread {res['start_spread_ms']} ms", flush=True)
             meter = (lambda db, floor: print(f"\r level {db:6.1f} dB  floor {floor:6.1f} dB   ", end="", flush=True)) if a.meter else None
             try:
                 ClapDetector(cfg).run(fire, on_level=meter)

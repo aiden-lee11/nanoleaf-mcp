@@ -511,26 +511,29 @@ class Nanoleaf:
 
     def start_sound_trigger(self, device: str, effect: str, sensitivity_db: float = 18, min_db: float = -30,
                             cooldown_s: float = 8, input_device: str | None = None) -> dict:
-        dev, c = self.one(device)
-        self.one_shot_body(c, effect)                      # validate before spawning
+        devs = self.targets(device)
+        for dev in devs:
+            self.one_shot_body(self.client(dev), effect)   # validate on every device before spawning
         try:
             import sounddevice  # noqa: F401
         except ImportError:
             raise RuntimeError("the clap listener needs the 'sound' extra: uv sync --extra sound")
         self.stop_sound_trigger(device)
-        log_path = self.reg.path.parent / f"listen-{dev.key}.log"
-        cmd = [sys.executable, "-m", "nanoleaf_mcp.cli", "-d", dev.label, "listen", "--effect", effect,
+        log_path = self.reg.path.parent / f"listen-{devs[0].key}.log"
+        cmd = [sys.executable, "-m", "nanoleaf_mcp.cli", "-d", device or "all", "listen", "--effect", effect,
                "--sensitivity", str(sensitivity_db), "--min-db", str(min_db), "--cooldown", str(cooldown_s)]
         if input_device:
             cmd += ["--input", input_device]
         proc = subprocess.Popen(cmd, stdout=open(log_path, "ab"), stderr=subprocess.STDOUT,
                                 stdin=subprocess.DEVNULL, start_new_session=True)
-        self._pidfile(dev).write_text(str(proc.pid))
-        return {"listening": True, "pid": proc.pid, "device": dev.label, "effect": effect, "log": str(log_path),
-                "note": "The Mac's microphone is the sound source; the animation plays on the panels on each clap."}
+        for dev in devs:
+            self._pidfile(dev).write_text(str(proc.pid))
+        return {"listening": True, "pid": proc.pid, "devices": [d.label for d in devs], "effect": effect, "log": str(log_path),
+                "note": "This computer's microphone is the sound source; the animation starts on every device at once on each clap."}
 
     def stop_sound_trigger(self, device: str | None = "all") -> dict:
         out = {}
+        killed: set[int] = set()
         for dev in self.targets(device):
             pf = self._pidfile(dev)
             if not pf.exists():
@@ -538,7 +541,9 @@ class Nanoleaf:
                 continue
             try:
                 pid = int(pf.read_text().strip())
-                os.killpg(pid, signal.SIGTERM)
+                if pid not in killed:
+                    os.killpg(pid, signal.SIGTERM)
+                    killed.add(pid)
                 out[dev.label] = {"stopped": True, "pid": pid}
             except (ValueError, ProcessLookupError, PermissionError) as e:
                 out[dev.label] = {"stopped": False, "error": str(e)}
@@ -559,13 +564,14 @@ class Nanoleaf:
         return out
 
     # ------------------------------------------------------------------ multi-controller scenes
-    def sync_play(self, effect_by_device: dict[str, str]) -> dict:
+    def sync_play(self, effect_by_device: dict[str, str], bodies: dict[str, tuple[dict, float]] | None = None) -> dict:
         """Start one-shot playback of the given effect on each device at the same instant (parallel threads
-        released by a barrier). Returns per-device results and the spread between send times in ms."""
+        released by a barrier). Returns per-device results and the spread between send times in ms.
+        bodies: optional pre-fetched {device: (body, duration)} so a trigger fires without an extra round trip."""
         plan = []
         for q, effect in effect_by_device.items():
             dev, c = self.one(q)
-            body, dur = self.one_shot_body(c, effect)
+            body, dur = bodies[q] if bodies and q in bodies else self.one_shot_body(c, effect)
             plan.append((dev, c, body, dur))
         if not plan:
             raise ValueError("no devices to play on")

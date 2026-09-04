@@ -26,8 +26,9 @@ def shooting_star(geo: Geo, period_s: float = 4.0):
 
 
 @scene("rocket_launch", "Rocket Launch", "Countdown on the pad, ignition, then the rocket climbs with a flame tail and smoke while an exhaust cloud rolls along the ground. One-shot.",
-       tags=("motion", "story"), loop=False, params={"countdown": 3})
-def rocket_launch(geo: Geo, countdown: int = 3):
+       tags=("motion", "story"), loop=False, params={"countdown": 3, "speed": 1.0},
+       param_docs={"countdown": "blinks on the pad before ignition", "speed": "time multiplier (1.3 = 30% faster)"})
+def rocket_launch(geo: Geo, countdown: int = 3, speed: float = 1.0):
     SPACE, RED, HEAD = (0, 0, 0), (220, 20, 20), (255, 255, 240)
     FLAME = [(255, 230, 80), (255, 120, 0), (200, 40, 10)]
     SMOKE = [(110, 110, 125), (70, 70, 85), (35, 35, 48), (14, 14, 28)]
@@ -35,7 +36,7 @@ def rocket_launch(geo: Geo, countdown: int = 3):
     steps: list[tuple[dict, float]] = []          # (overrides by key, seconds)
 
     def scene_step(over=None, secs=0.1):
-        steps.append((dict(over or {}), secs))
+        steps.append((dict(over or {}), max(0.1, secs / max(0.1, speed))))
 
     if geo.nrows >= 3:                             # tall layout: straight up the middle column
         mid = (geo.ncols - 1) / 2

@@ -322,8 +322,8 @@ def build(name: str, geo: Geo, params: dict[str, Any] | None = None) -> tuple[Sc
 
 
 # ---------------------------------------------------------------- sampling ----------------------------------
-def sample_keyframes(geo: Geo, fn: SceneFn, duration_s: float, step_tenths: int = 1, quant: int = 12
-                     ) -> dict[str, dict[int, list[dict]]]:
+def sample_keyframes(geo: Geo, fn: SceneFn, duration_s: float, step_tenths: int = 1, quant: int = 12,
+                     min_delta: int = 20) -> dict[str, dict[int, list[dict]]]:
     """Sample fn every step_tenths (tenths of a second) into per-device keyframes
     {device: {panelId: [{"color": "rgb(r,g,b)", "transition": tenths}, ...]}}, merging runs of identical colour.
     Colour channels are rounded to multiples of `quant` first so near-identical samples merge (12 is invisible)."""
@@ -331,19 +331,25 @@ def sample_keyframes(geo: Geo, fn: SceneFn, duration_s: float, step_tenths: int 
     out: dict[str, dict[int, list[dict]]] = {}
     q = max(1, quant)
     for p in geo.panels:
-        runs: list[list] = []                      # [colour, ticks] for each run of identical colour
+        runs: list[list] = []                      # [colour, ticks, rgb] for each run of (nearly) identical colour
         for k in range(steps):
-            r, g, b = to_rgb(fn(k * step_tenths / 10, p))
+            rgb = to_rgb(fn(k * step_tenths / 10, p))
+            # hysteresis: a slowly drifting colour only starts a new keyframe once it has moved by min_delta on
+            # some channel, otherwise gentle gradients dither between two rounded values several times a second
+            if runs and max(abs(rgb[i] - runs[-1][2][i]) for i in range(3)) < min_delta:
+                runs[-1][1] += step_tenths
+                continue
+            r, g, b = rgb
             col = f"rgb({int(round(r / q)) * q},{int(round(g / q)) * q},{int(round(b / q)) * q})"
             if runs and runs[-1][0] == col:
                 runs[-1][1] += step_tenths
             else:
-                runs.append([col, step_tenths])
+                runs.append([col, step_tenths, rgb])
         # A keyframe's time is how long the panel takes to FADE INTO its colour. So a run of N ticks becomes a quick
         # fade in (one tick) followed by a hold (a keyframe of the same colour lasting the rest); one keyframe with
         # the whole run length would smear every change into a slow fade.
         seq = out.setdefault(p.device, {}).setdefault(p.id, [])
-        for col, ticks in runs:
+        for col, ticks, _ in runs:
             seq.append({"color": col, "transition": step_tenths})
             if ticks > step_tenths:
                 seq.append({"color": col, "transition": ticks - step_tenths})

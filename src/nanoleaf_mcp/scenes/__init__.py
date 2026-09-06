@@ -206,7 +206,8 @@ def make_layout(nrows: int, ncols: int, remove: Iterable[tuple[int, int]] = ()) 
 
 
 def parse_layout_spec(spec: str) -> tuple[str, list[dict]]:
-    """'4x8' -> 4 rows of 8; '4x8-2' -> the same minus two opposite corners; '5x6-bl' minus the bottom-left corner."""
+    """'4x8' -> 4 rows of 8; '4x8-2' -> minus two opposite corners (bottom-left, top-right); '4x8-l' / '4x8-r' -> minus
+    both left / both right corners (a symmetric block); '4x8-4' -> minus all four; '5x6-bl' / '5x6-tr' -> one corner."""
     s = spec.lower().strip()
     base, _, mod = s.partition("-")
     r, _, c = base.partition("x")
@@ -218,12 +219,18 @@ def parse_layout_spec(spec: str) -> tuple[str, list[dict]]:
         remove = {(0, 0)}
     elif mod == "tr":
         remove = {(nrows - 1, ncols - 1)}
+    elif mod == "l":
+        remove = {(0, 0), (nrows - 1, 0)}
+    elif mod == "r":
+        remove = {(0, ncols - 1), (nrows - 1, ncols - 1)}
     elif mod == "4":
         remove = {(0, 0), (0, ncols - 1), (nrows - 1, 0), (nrows - 1, ncols - 1)}
     elif mod:
-        raise ValueError(f"unknown layout modifier {mod!r} (use 2, 4, bl or tr)")
+        raise ValueError(f"unknown layout modifier {mod!r} (use 2, l, r, 4, bl or tr)")
     pos = make_layout(nrows, ncols, remove)
-    return f"{nrows} rows of {ncols}" + (f" minus {len(remove)} corner(s)" if remove else "") + f" ({len(pos)} panels)", pos
+    what = {"2": "minus two opposite corners", "l": "minus both left corners", "r": "minus both right corners", "4": "minus all four corners",
+            "bl": "minus the bottom-left corner", "tr": "minus the top-right corner"}.get(mod, "")
+    return f"{nrows} rows of {ncols}" + (f" {what}" if what else "") + f" ({len(pos)} panels)", pos
 
 
 # ---------------------------------------------------------------- colours -----------------------------------

@@ -150,6 +150,8 @@ PIXEL_ART: dict[str, dict] = {
         (2, 0): "#8d8d99", (2, 1): "#8d8d99", (2, 2): "#2bd36b", (2, 3): "#8d8d99", (2, 4): "#2bd36b", (2, 5): "#8d8d99", (2, 6): "#8d8d99",   # green eyes
         (1, 1): "#8d8d99", (1, 2): "#8d8d99", (1, 3): "#ffb6c1", (1, 4): "#8d8d99", (1, 5): "#8d8d99",   # pink nose
         (0, 2): "#8d8d99", (0, 3): "#8d8d99", (0, 4): "#8d8d99"}},                    # chin
+    "letter_h": {"title": "Letter H", "cells": {**{(r, c): "#9b30ff" for r in range(4) for c in (1, 2, 5, 6)},   # two uprights
+                                                **{(r, c): "#9b30ff" for r in (1, 2) for c in (3, 4)}}},          # crossbar
     "house": {"title": "House", "cells": {
         (3, 3): "#c62828", (2, 2): "#c62828", (2, 3): "#c62828", (2, 4): "#c62828",     # roof
         (1, 2): "#f5deb3", (1, 3): "#f5deb3", (1, 4): "#f5deb3",                       # walls

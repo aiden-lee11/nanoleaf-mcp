@@ -15,6 +15,30 @@ def _precompute(loop_s: float, dt: float, step):
     return frames
 
 
+def _precompute_clean(dt, step, state, keys=("over",), min_s=8.0, max_s=60.0, force=None):
+    """Like _precompute, but the loop ends exactly when the game has just reset after a game-over (any of `keys`
+    going from set to None), so a stored replay always starts fresh. If no game-over happens by max_s, one is
+    forced (via `force(t)` or by setting state[keys[0]] = t) and the loop ends after that reset."""
+    frames, t, forced = [], 0.0, False
+    was_over = False
+    while True:
+        frames.append(dict(step(t)))
+        t += dt
+        over = any(state.get(k) is not None for k in keys)
+        if was_over and not over and t >= min_s:
+            break
+        was_over = over
+        if t >= max_s and not over and not forced:
+            forced = True
+            if force:
+                force(t)
+            else:
+                state[keys[0]] = t
+        if t > max_s + 10:
+            break
+    return frames, len(frames) * dt
+
+
 def _player(frames, dt, loop_s, background):
     def fn(t: float, p: Panel):
         f = frames[int((t % loop_s) / dt) % len(frames)]
@@ -82,8 +106,7 @@ def breakout(geo: Geo, seed: int = 1):
         frame[bc] = (255, 255, 210)
         return frame
 
-    loop = 24.0
-    frames = _precompute(loop, dt, step)
+    frames, loop = _precompute_clean(dt, step, state, keys=("won",), min_s=10.0, max_s=40.0)
     return _player(frames, dt, loop, lambda t, p: hsb(230, 60, 3)), loop
 
 
@@ -312,8 +335,7 @@ def tetris(geo: Geo, seed: int = 5, fall_s: float = 0.3):
             frame[c] = pc["colour"]
         return frame
 
-    loop = 30.0
-    frames = _precompute(loop, dt, step)
+    frames, loop = _precompute_clean(dt, step, state, keys=("over",), min_s=10.0, max_s=45.0)
     return _player(frames, dt, loop, lambda t, p: hsb(230, 50, 4)), loop
 
 
@@ -460,8 +482,7 @@ def bricks_balls(geo: Geo, seed: int = 6, balls: int = 6):
         frame[cell(s["launch_u"], 0.0)] = (160, 20, 20)
         return frame
 
-    loop = 30.0
-    frames = _precompute(loop, dt, step)
+    frames, loop = _precompute_clean(dt, step, state, keys=("over",), min_s=10.0, max_s=45.0)
     return _player(frames, dt, loop, lambda t, p: hsb(230, 40, 4)), loop
 
 
@@ -622,6 +643,5 @@ def suika(geo: Geo, seed: int = 8, drop_s: float = 0.9):
             frame[f["cell"]] = LEVELS[f["lvl"]]
         return frame
 
-    loop = 40.0
-    frames = _precompute(loop, dt, step)
+    frames, loop = _precompute_clean(dt, step, state, keys=("over",), min_s=15.0, max_s=50.0)
     return _player(frames, dt, loop, lambda t, p: hsb(40, 50, 8)), loop

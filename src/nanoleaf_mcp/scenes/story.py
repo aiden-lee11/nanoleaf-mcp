@@ -6,32 +6,47 @@ import math
 from . import Geo, Panel, hsb, mix, scene, tri
 
 
-@scene("bunny_hop", "Bunny Hop", "A white bunny hops along the top of the grass and back: grass below (never covered), sky above, a cloud and a sun.",
-       tags=("story", "cute"), params={"loop_s": 14.0, "hop_s": 1.1},
-       param_docs={"loop_s": "seconds for a full trip there and back", "hop_s": "seconds per hop"})
-def bunny_hop(geo: Geo, loop_s: float = 14.0, hop_s: float = 1.1):
+@scene("bunny_hop", "Bunny Hop", "A white bunny hops panel by panel along the top of the grass and back: grass below (never covered), sky above, a cloud and a sun.",
+       tags=("story", "cute"), params={"hop_s": 1.1}, param_docs={"hop_s": "seconds per hop"})
+def bunny_hop(geo: Geo, hop_s: float = 1.1):
     top_row = geo.nrows - 1
-    grass = 0 if geo.nrows > 1 else -1                    # the grass row; the bunny never lands on it
-    base_row = 1 if geo.nrows > 1 else 0                  # the bunny runs along the row just above the grass
-    hop_rows = 0 if geo.nrows < 3 else (2 if geo.nrows >= 5 else 1)
-    above = [p for p in geo.panels if p.row != grass]
-    v_of = lambda r: r / max(1, geo.nrows - 1)
+    grass = 0 if geo.nrows > 1 else -1
+    ground_row = 1 if geo.nrows > 1 else 0
+    air_row = ground_row + 1 if geo.nrows >= 3 else None
+    ground = sorted((p for p in geo.panels if p.row == ground_row), key=lambda p: p.x)
+    air = sorted((p for p in geo.panels if air_row is not None and p.row == air_row), key=lambda p: p.x)
+    n = len(ground)
+    hops = max(1, n - 1)
+    loop = 2 * hops * hop_s
 
-    def nearest_above(u, v):
-        X, Y = geo.point(u, v)
-        return min(above, key=lambda q: (q.x - X) ** 2 + (q.y - Y) ** 2)
+    def air_panel(a, b):
+        if not air:
+            return None
+        mx = (a.x + b.x) / 2
+        return min(air, key=lambda p: abs(p.x - mx))
 
-    def where(t):
-        u = 0.06 + 0.88 * tri(t, loop_s)
-        v = v_of(base_row) + (v_of(hop_rows) if hop_rows else 0.0) * abs(math.sin(math.pi * t / hop_s))
-        return u, v
+    def state(t):
+        """(current panel, previous ground panel) for the hop timeline: there and back."""
+        k = int((t % loop) / hop_s)                 # hop index 0 .. 2*hops-1
+        f = ((t % loop) - k * hop_s) / hop_s        # progress within the hop
+        if k < hops:
+            a, b = ground[k], ground[k + 1]
+        else:
+            kk = k - hops
+            a, b = ground[n - 1 - kk], ground[n - 2 - kk]
+        mid = air_panel(a, b)
+        if f < 0.3:
+            return a, None
+        if f < 0.7 and mid is not None:
+            return mid, a
+        return b, a
 
     def fn(t: float, p: Panel):
-        here, before = nearest_above(*where(t)), nearest_above(*where(t - 0.3))
+        here, before = state(t)
         if p is here:
             return (255, 250, 235)
         if p is before:
-            return mix((90, 160, 255), (255, 250, 235), 0.4)
+            return mix((90, 160, 255) if p.row != grass else (70, 150, 80), (255, 250, 235), 0.35)
         if p.row == grass:
             return hsb(125, 75, 55 if p.col % 2 else 68)
         if geo.nrows == 1:
@@ -41,7 +56,7 @@ def bunny_hop(geo: Geo, loop_s: float = 14.0, hop_s: float = 1.1):
         if p.row == top_row and p.col <= 1:
             return hsb(205, 12, 92)
         return hsb(208, 70 - 15 * p.v, 78 + 18 * p.v)
-    return fn, loop_s
+    return fn, loop
 
 
 @scene("tennis_rally", "Tennis Rally", "A ball arcs over the net and back between a red and a green player; the court is below.",

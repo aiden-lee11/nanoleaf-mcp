@@ -80,9 +80,9 @@ def stained_glass(geo: Geo, style: str = "rose", colors=("#c8102e", "#0033a0", "
 
 @scene("heart", "Pixel Heart", "A pixel-art heart: red with a pink highlight on a dark background.",
        tags=("static", "design", "pixel"), static=True,
-       params={"color": "#ff1e3c", "highlight": True, "scale": 1.0},
+       params={"color": "#ff1e3c", "highlight": False, "scale": 1.0},
        param_docs={"color": "heart colour", "highlight": "pink glint on the upper-left lobe", "scale": "1.0 fills the layout; smaller shrinks the heart"})
-def heart(geo: Geo, color: str = "#ff1e3c", highlight: bool = True, scale: float = 1.0):
+def heart(geo: Geo, color: str = "#ff1e3c", highlight: bool = False, scale: float = 1.0):
     import math
     base = to_rgb(color)
     pink = tuple(min(255, int(c * 0.55 + 255 * 0.45)) for c in base)
@@ -93,10 +93,10 @@ def heart(geo: Geo, color: str = "#ff1e3c", highlight: bool = True, scale: float
         return (x * x + y * y - 1) ** 3 - x * x * y ** 3 <= 0
     lit = {p.key for p in geo.panels if inside(p.u, p.v)}
     if geo.nrows == 4 and geo.ncols == 8:                  # hand-tuned pixel mask for the 4-row-by-8 block
-        # centred on the down-pointing tip at column 3: lobes of two, a one-panel dip, a seven-wide shoulder row,
-        # a three-panel waist, then the tip
+        # a tip at column 3 with both sides running straight up the grid's 60-degree diagonals to the lobes,
+        # and a one-panel V dip between the lobes; nothing outside the diagonals
         mask = {(3, 1), (3, 2), (3, 4), (3, 5),
-                (2, 0), (2, 1), (2, 2), (2, 3), (2, 4), (2, 5), (2, 6),
+                (2, 1), (2, 2), (2, 3), (2, 4), (2, 5),
                 (1, 2), (1, 3), (1, 4),
                 (0, 3)}
         lit = {p.key for p in geo.panels if (p.row, p.col) in mask}

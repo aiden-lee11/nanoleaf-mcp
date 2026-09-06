@@ -93,8 +93,12 @@ def heart(geo: Geo, color: str = "#ff1e3c", highlight: bool = True, scale: float
         return (x * x + y * y - 1) ** 3 - x * x * y ** 3 <= 0
     lit = {p.key for p in geo.panels if inside(p.u, p.v)}
     if geo.nrows == 4 and geo.ncols == 8:                  # hand-tuned pixel mask for the 4-row-by-8 block
-        mask = {(3, 1), (3, 2), (3, 5), (3, 6), (2, 0), (2, 1), (2, 2), (2, 3), (2, 4), (2, 5), (2, 6), (2, 7),
-                (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (0, 3), (0, 4)}
+        # centred on the down-pointing tip at column 3: lobes of two, a one-panel dip, a seven-wide shoulder row,
+        # a three-panel waist, then the tip
+        mask = {(3, 1), (3, 2), (3, 4), (3, 5),
+                (2, 0), (2, 1), (2, 2), (2, 3), (2, 4), (2, 5), (2, 6),
+                (1, 2), (1, 3), (1, 4),
+                (0, 3)}
         lit = {p.key for p in geo.panels if (p.row, p.col) in mask}
     glint = None
     if highlight and lit:

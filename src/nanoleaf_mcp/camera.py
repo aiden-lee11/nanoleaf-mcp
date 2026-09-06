@@ -164,11 +164,21 @@ def draw_map(nl, device: str, calib: dict, out: Path) -> Path:
 
 
 def check(nl, device: str, scene: str | None = None, effect: str | None = None, at_s: float = 0.0,
-          params: dict | None = None, out: Path | None = None, radius: int = 9) -> dict:
-    """Compare what the panels should show with what the camera sees at each calibrated panel position."""
+          params: dict | None = None, out: Path | None = None, radius: int = 9, brightness: int | None = 20) -> dict:
+    """Compare what the panels should show with what the camera sees at each calibrated panel position.
+
+    Lit vs dark is judged on luminance relative to the brightest panel in the same photo (a webcam's auto-exposure
+    blows lit panels out to white while the wall around them only glows in the panels' colour, so absolute
+    brightness or HSV 'value' cannot tell an off panel from the glow). Hue is compared only where the camera
+    still sees colour. `brightness` temporarily dims the panels so colours are less saturated."""
     cv2, np = _cv2()
     calib = load_calibration(nl, device)
     dev, c = nl.one(device)
+    prev_brightness = None
+    if brightness is not None:
+        prev_brightness = c.state()["brightness"]["value"]
+        c.set_state(brightness=brightness)
+        time.sleep(0.6)
     if scene:
         from . import scenes as _scenes
         geo, devs, clients, _ = nl.geo_for([dev.label])
@@ -189,26 +199,37 @@ def check(nl, device: str, scene: str | None = None, effect: str | None = None, 
         what = "whatever is showing"
     cam = Camera(calib.get("camera", 0))
     try:
-        img = cam.grab(settle=0.3, frames=3)
+        img = cam.grab(settle=0.4, frames=3)
     finally:
         cam.close()
+        if prev_brightness is not None:
+            c.set_state(brightness=prev_brightness)
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    rows, mism = [], 0
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    samples = {}
     for pid, p in calib["panels"].items():
         x, y = int(p["x"]), int(p["y"])
         patch = hsv[max(0, y - radius):y + radius, max(0, x - radius):x + radius]
-        hh, ss, vv = patch[..., 0].mean() * 2, patch[..., 1].mean() / 2.55, patch[..., 2].mean() / 2.55
-        seen_lit = vv > 30
-        row = {"panel": pid, "seen": {"hue": round(float(hh)), "sat": round(float(ss)), "val": round(float(vv))}}
+        lum = float(gray[max(0, y - radius):y + radius, max(0, x - radius):x + radius].mean())
+        samples[pid] = (patch[..., 0].mean() * 2, patch[..., 1].mean() / 2.55, patch[..., 2].mean() / 2.55, lum)
+    brightest = max(v[3] for v in samples.values()) if samples else 255.0
+    darkest = min(v[3] for v in samples.values()) if samples else 0.0
+    cut = darkest + 0.45 * (brightest - darkest)          # halfway between the darkest and brightest panel
+    rows, mism = [], 0
+    for pid, p in calib["panels"].items():
+        x, y = int(p["x"]), int(p["y"])
+        hh, ss, vv, lum = samples[pid]
+        seen_lit = lum > cut and lum > 40
+        row = {"panel": pid, "seen": {"hue": round(float(hh)), "sat": round(float(ss)), "lum": round(lum), "lit": bool(seen_lit)}}
         if expected and pid in expected:
             eh, es, ev = parse_color(expected[pid])
             row["expected"] = {"hue": eh, "sat": es, "val": ev, "hex": expected[pid]}
             exp_lit = ev > 12
             if exp_lit != seen_lit:
                 row["mismatch"] = "expected lit, seen dark" if exp_lit else "expected dark, seen lit"
-            elif exp_lit and es > 30 and ss > 25:
+            elif exp_lit and es > 30 and ss > 35 and vv < 97:   # colour survives only when not blown out
                 dh = min(abs(eh - hh), 360 - abs(eh - hh))
-                if dh > 40:
+                if dh > 45:
                     row["mismatch"] = f"hue off by {dh:.0f}°"
             if "mismatch" in row:
                 mism += 1
@@ -218,5 +239,5 @@ def check(nl, device: str, scene: str | None = None, effect: str | None = None, 
         cv2.putText(img, str(pid), (x - 10, y - radius - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
     out = out or (nl.reg.path.parent / f"camera-check-{dev.key}.jpg")
     cv2.imwrite(str(out), img)
-    return {"what": what, "panels_checked": len(rows), "mismatches": mism,
+    return {"what": what, "panels_checked": len(rows), "mismatches": mism, "lit_cutoff": round(cut),
             "details": [r for r in rows if "mismatch" in r] if expected else rows, "image": str(out)}

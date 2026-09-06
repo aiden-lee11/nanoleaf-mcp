@@ -6,25 +6,33 @@ import math
 from . import Geo, Panel, hsb, mix, scene, tri
 
 
-@scene("bunny_hop", "Bunny Hop", "A white bunny hops across a field and back: grass below, sky above, a cloud and a sun.",
-       tags=("story", "cute"), params={"loop_s": 8.0, "hop_s": 0.8})
-def bunny_hop(geo: Geo, loop_s: float = 8.0, hop_s: float = 0.8):
-    hop_rows = max(1, min(2, geo.nrows - 2)) if geo.nrows >= 3 else (1 if geo.nrows == 2 else 0)
+@scene("bunny_hop", "Bunny Hop", "A white bunny hops along the top of the grass and back: grass below (never covered), sky above, a cloud and a sun.",
+       tags=("story", "cute"), params={"loop_s": 14.0, "hop_s": 1.1},
+       param_docs={"loop_s": "seconds for a full trip there and back", "hop_s": "seconds per hop"})
+def bunny_hop(geo: Geo, loop_s: float = 14.0, hop_s: float = 1.1):
     top_row = geo.nrows - 1
+    grass = 0 if geo.nrows > 1 else -1                    # the grass row; the bunny never lands on it
+    base_row = 1 if geo.nrows > 1 else 0                  # the bunny runs along the row just above the grass
+    hop_rows = 0 if geo.nrows < 3 else (2 if geo.nrows >= 5 else 1)
+    above = [p for p in geo.panels if p.row != grass]
+    v_of = lambda r: r / max(1, geo.nrows - 1)
+
+    def nearest_above(u, v):
+        X, Y = geo.point(u, v)
+        return min(above, key=lambda q: (q.x - X) ** 2 + (q.y - Y) ** 2)
 
     def where(t):
         u = 0.06 + 0.88 * tri(t, loop_s)
-        v = (hop_rows / max(1, geo.nrows - 1)) * abs(math.sin(math.pi * t / hop_s)) if geo.nrows > 1 else 0.0
-        return u, 0.02 + v
+        v = v_of(base_row) + (v_of(hop_rows) if hop_rows else 0.0) * abs(math.sin(math.pi * t / hop_s))
+        return u, v
 
     def fn(t: float, p: Panel):
-        here, before = geo.nearest(*where(t)), geo.nearest(*where(t - 0.22))
+        here, before = nearest_above(*where(t)), nearest_above(*where(t - 0.3))
         if p is here:
             return (255, 250, 235)
         if p is before:
-            base = (70, 150, 80) if p.row == 0 else (90, 160, 255)
-            return mix(base, (255, 250, 235), 0.4)
-        if p.row == 0 and geo.nrows > 1:
+            return mix((90, 160, 255), (255, 250, 235), 0.4)
+        if p.row == grass:
             return hsb(125, 75, 55 if p.col % 2 else 68)
         if geo.nrows == 1:
             return hsb(125, 75, 45 if p.col % 2 else 60)

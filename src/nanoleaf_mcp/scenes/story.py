@@ -90,8 +90,13 @@ def fish(geo: Geo, loop_s: float = 12.0):
     for r in rows:
         rows[r].sort(key=lambda p: p.x)
     top = geo.nrows - 1
-    lanes = [top if geo.nrows <= 2 else top - 1, max(1, top // 2), 1 if geo.nrows > 1 else 0]
-    if geo.nrows == 1:
+    if geo.nrows >= 4:
+        lanes = [top, top - 1, 1]                    # one fish per row, never sharing a lane
+    elif geo.nrows == 3:
+        lanes = [2, 1, 2]
+    elif geo.nrows == 2:
+        lanes = [1, 1, 1]
+    else:
         lanes = [0, 0, 0]
     # (lane row, panels per loop (crossings), direction, body, tail)
     school = [(lanes[0], 1, +1, (255, 140, 0), (200, 90, 0)),

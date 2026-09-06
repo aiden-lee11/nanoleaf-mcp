@@ -105,7 +105,9 @@ uv run nanoleaf sync-play "Crashing Wave"
 ### Planning a rebuild
 
 `uv run nanoleaf mock --layout 4x8-2 --layout 5x6 --layout 3x10 --out mock.html` writes a page that animates every
-scene on those shapes (`4x8-2` = 4 rows of 8 minus two opposite corners). Nanoleaf's stated limit is 30 panels per
+scene on those shapes (`4x8-2` = 4 rows of 8 minus two opposite corners). Its **Build plan** tab gives each layout's
+real dimensions, a centring calculator, the recommended start panel and build order, and a step-by-step mounting
+animation showing where the three Command strips go on every panel (tabs out) and which edge takes the linker. Nanoleaf's stated limit is 30 panels per
 controller; triangles cannot form straight vertical sides, so a "rectangle" of them has zigzag left and right edges.
 
 ## Clap trigger

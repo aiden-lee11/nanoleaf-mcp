@@ -76,3 +76,33 @@ def stained_glass(geo: Geo, style: str = "rose", colors=("#c8102e", "#0033a0", "
             light *= 0.55 + 0.45 * (0.6 * beam + 0.4 * clouds)
         return (int(r * light), int(g * light), int(b * light))
     return fn, period_s * 1.7 * 10 if sunlight else 1.0   # sunlight loops when both cycles realign
+
+
+@scene("heart", "Pixel Heart", "A pixel-art heart: red with a pink highlight on a dark background.",
+       tags=("static", "design", "pixel"), static=True,
+       params={"color": "#ff1e3c", "highlight": True, "scale": 1.0},
+       param_docs={"color": "heart colour", "highlight": "pink glint on the upper-left lobe", "scale": "1.0 fills the layout; smaller shrinks the heart"})
+def heart(geo: Geo, color: str = "#ff1e3c", highlight: bool = True, scale: float = 1.0):
+    import math
+    base = to_rgb(color)
+    pink = tuple(min(255, int(c * 0.55 + 255 * 0.45)) for c in base)
+    # implicit heart curve (x^2 + y^2 - 1)^3 - x^2 y^3 <= 0, mapped over the layout's bounding box
+    def inside(u, v):
+        x = (u - 0.5) * 2.6 / scale
+        y = (v - 0.45) * 2.5 / scale
+        return (x * x + y * y - 1) ** 3 - x * x * y ** 3 <= 0
+    lit = {p.key for p in geo.panels if inside(p.u, p.v)}
+    if geo.nrows == 4 and geo.ncols == 8:                  # hand-tuned pixel mask for the 4-row-by-8 block
+        mask = {(3, 1), (3, 2), (3, 5), (3, 6), (2, 0), (2, 1), (2, 2), (2, 3), (2, 4), (2, 5), (2, 6), (2, 7),
+                (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (0, 3), (0, 4)}
+        lit = {p.key for p in geo.panels if (p.row, p.col) in mask}
+    glint = None
+    if highlight and lit:
+        cands = [p for p in geo.panels if p.key in lit and p.u < 0.5]
+        glint = max(cands, key=lambda p: p.v - 0.3 * abs(p.u - 0.28)).key if cands else None
+
+    def fn(t: float, p: Panel):
+        if p.key == glint:
+            return pink
+        return base if p.key in lit else (0, 0, 0)
+    return fn, 0.0

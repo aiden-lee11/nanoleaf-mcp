@@ -78,35 +78,96 @@ def stained_glass(geo: Geo, style: str = "rose", colors=("#c8102e", "#0033a0", "
     return fn, period_s * 1.7 * 10 if sunlight else 1.0   # sunlight loops when both cycles realign
 
 
-@scene("heart", "Pixel Heart", "A pixel-art heart: red with a pink highlight on a dark background.",
+@scene("heart", "Pixel Heart", "A pixel-art heart. style 'open' leaves the dip between the lobes dark; 'filled' fills it in a darker red and lightens the interior for depth.",
        tags=("static", "design", "pixel"), static=True,
-       params={"color": "#ff1e3c", "highlight": False, "scale": 1.0},
-       param_docs={"color": "heart colour", "highlight": "pink glint on the upper-left lobe", "scale": "1.0 fills the layout; smaller shrinks the heart"})
-def heart(geo: Geo, color: str = "#ff1e3c", highlight: bool = False, scale: float = 1.0):
+       params={"color": "#ff1e3c", "style": "open", "scale": 1.0},
+       param_docs={"color": "heart colour", "style": "open | filled", "scale": "1.0 fills the layout; smaller shrinks the heart"})
+def heart(geo: Geo, color: str = "#ff1e3c", style: str = "open", scale: float = 1.0):
     import math
     base = to_rgb(color)
-    pink = tuple(min(255, int(c * 0.55 + 255 * 0.45)) for c in base)
-    # implicit heart curve (x^2 + y^2 - 1)^3 - x^2 y^3 <= 0, mapped over the layout's bounding box
+    light = tuple(min(255, int(c * 0.75 + 255 * 0.25)) for c in base)
+    dark = tuple(int(c * 0.45) for c in base)
     def inside(u, v):
         x = (u - 0.5) * 2.6 / scale
         y = (v - 0.45) * 2.5 / scale
         return (x * x + y * y - 1) ** 3 - x * x * y ** 3 <= 0
-    lit = {p.key for p in geo.panels if inside(p.u, p.v)}
-    if geo.nrows == 4 and geo.ncols == 8:                  # hand-tuned pixel mask for the 4-row-by-8 block
+    lit = {p.key: base for p in geo.panels if inside(p.u, p.v)}
+    if geo.nrows == 4 and geo.ncols == 8:                  # hand-tuned for the 4-row-by-8 block
         # a tip at column 3 with both sides running straight up the grid's 60-degree diagonals to the lobes,
         # and a one-panel V dip between the lobes; nothing outside the diagonals
-        mask = {(3, 1), (3, 2), (3, 4), (3, 5),
-                (2, 1), (2, 2), (2, 3), (2, 4), (2, 5),
-                (1, 2), (1, 3), (1, 4),
-                (0, 3)}
-        lit = {p.key for p in geo.panels if (p.row, p.col) in mask}
-    glint = None
-    if highlight and lit:
-        cands = [p for p in geo.panels if p.key in lit and p.u < 0.5]
-        glint = max(cands, key=lambda p: p.v - 0.3 * abs(p.u - 0.28)).key if cands else None
+        outline = {(3, 1), (3, 2), (3, 4), (3, 5), (2, 1), (2, 5), (1, 2), (1, 4), (0, 3)}
+        interior = {(2, 2), (2, 3), (2, 4), (1, 3)}
+        dip = {(3, 3)}
+        lit = {}
+        for p in geo.panels:
+            cell = (p.row, p.col)
+            if cell in outline:
+                lit[p.key] = base
+            elif cell in interior:
+                lit[p.key] = light if style == "filled" else base
+            elif cell in dip and style == "filled":
+                lit[p.key] = dark
 
     def fn(t: float, p: Panel):
-        if p.key == glint:
-            return pink
-        return base if p.key in lit else (0, 0, 0)
+        return lit.get(p.key, (0, 0, 0))
+    return fn, 0.0
+
+
+# ---------------------------------------------------------------- pixel art on the 4-row block -------------------
+# Designs drawn on a 4-row-by-8 triangle grid, (row, col) from the bottom-left. Row parity matters: even rows have
+# up-pointing panels in even columns, odd rows in odd columns, which is what makes ears, peaks and tips work.
+PIXEL_ART: dict[str, dict] = {
+    "fox": {"title": "Fox", "cells": {
+        (3, 1): "#ff7a1a", (3, 5): "#ff7a1a",                                        # ears (pointing up)
+        (3, 2): "#ff7a1a", (3, 4): "#ff7a1a",
+        (2, 0): "#ff7a1a", (2, 1): "#ff7a1a", (2, 2): "#1a1a2e", (2, 3): "#ff7a1a", (2, 4): "#1a1a2e", (2, 5): "#ff7a1a", (2, 6): "#ff7a1a",   # eyes dark
+        (1, 1): "#fff4e6", (1, 2): "#ff7a1a", (1, 3): "#fff4e6", (1, 4): "#ff7a1a", (1, 5): "#fff4e6",   # white cheeks and snout
+        (0, 3): "#111111"}},                                                          # nose
+    "tree": {"title": "Christmas Tree", "cells": {
+        (3, 3): "#ffd200",                                                            # star
+        (2, 2): "#1f8a3a", (2, 3): "#ffd200", (2, 4): "#1f8a3a",
+        (1, 1): "#1f8a3a", (1, 2): "#e5232e", (1, 3): "#1f8a3a", (1, 4): "#e5232e", (1, 5): "#1f8a3a",
+        (0, 3): "#7a4a1e"}},                                                          # trunk
+    "star": {"title": "Six-pointed Star", "cells": {c: "#ffd54a" for c in
+        [(1, 3), (1, 4), (1, 5), (2, 3), (2, 4), (2, 5),                              # hexagon core
+         (0, 4), (3, 4), (1, 2), (2, 2), (1, 6), (2, 6)]}},                           # six points
+    "bolt": {"title": "Lightning Bolt", "cells": {c: "#ffe600" for c in
+        [(3, 5), (3, 6), (2, 4), (2, 5), (1, 2), (1, 3), (1, 4), (1, 5), (0, 3)]}},
+    "mountains": {"title": "Mountains and Sun", "cells": {
+        (3, 1): "#ffffff", (3, 5): "#ffffff", (3, 3): "#ffb300",                       # snow peaks, sun
+        (2, 0): "#6e7b8b", (2, 1): "#6e7b8b", (2, 2): "#6e7b8b", (2, 4): "#6e7b8b", (2, 5): "#6e7b8b", (2, 6): "#6e7b8b",
+        (2, 3): "#3a4452",
+        **{(1, c): "#2e7d32" for c in range(0, 8)}, **{(0, c): "#1b5e20" for c in range(1, 8)}}},
+    "butterfly": {"title": "Butterfly", "cells": {
+        (3, 3): "#222233", (2, 3): "#222233", (1, 3): "#222233",                       # body
+        (3, 2): "#333355", (3, 4): "#333355",                                          # antennae
+        (2, 0): "#ff3fa4", (2, 1): "#ff3fa4", (2, 2): "#00c2ff", (2, 4): "#00c2ff", (2, 5): "#ff3fa4", (2, 6): "#ff3fa4",
+        (1, 1): "#ff3fa4", (1, 2): "#ff3fa4", (1, 4): "#ff3fa4", (1, 5): "#ff3fa4"}},
+    "arrow": {"title": "Arrow Up", "cells": {c: "#00e5ff" for c in
+        [(3, 3), (2, 2), (2, 3), (2, 4), (1, 3), (0, 3)]}},
+    "cat": {"title": "Cat", "cells": {
+        (3, 1): "#8d8d99", (3, 5): "#8d8d99", (3, 2): "#8d8d99", (3, 4): "#8d8d99",
+        (2, 0): "#8d8d99", (2, 1): "#8d8d99", (2, 2): "#2bd36b", (2, 3): "#8d8d99", (2, 4): "#2bd36b", (2, 5): "#8d8d99", (2, 6): "#8d8d99",   # green eyes
+        (1, 1): "#8d8d99", (1, 2): "#8d8d99", (1, 3): "#ffb6c1", (1, 4): "#8d8d99", (1, 5): "#8d8d99",   # pink nose
+        (0, 2): "#8d8d99", (0, 3): "#8d8d99", (0, 4): "#8d8d99"}},                    # chin
+    "house": {"title": "House", "cells": {
+        (3, 3): "#c62828", (2, 2): "#c62828", (2, 3): "#c62828", (2, 4): "#c62828",     # roof
+        (1, 2): "#f5deb3", (1, 3): "#f5deb3", (1, 4): "#f5deb3",                       # walls
+        (0, 2): "#f5deb3", (0, 3): "#5d4037", (0, 4): "#f5deb3",                       # door
+        (1, 5): "#ffd54a"}},                                                           # lit window? (outside wall) -> lantern
+}
+
+
+@scene("pixel_art", "Pixel Art", "Hand-drawn pixel art for a 4-row block: fox, cat, christmas tree, six-pointed star, lightning bolt, mountains and sun, butterfly, arrow, house.",
+       tags=("static", "design", "pixel"), static=True, params={"design": "fox"},
+       param_docs={"design": " | ".join(PIXEL_ART)}, min_rows=4)
+def pixel_art(geo: Geo, design: str = "fox"):
+    key = design.strip().lower()
+    if key not in PIXEL_ART:
+        raise ValueError(f"unknown design {design!r}; choose from {', '.join(PIXEL_ART)}")
+    cells = PIXEL_ART[key]["cells"]
+    lit = {p.key: to_rgb(cells[(p.row, p.col)]) for p in geo.panels if (p.row, p.col) in cells}
+
+    def fn(t: float, p: Panel):
+        return lit.get(p.key, (0, 0, 0))
     return fn, 0.0

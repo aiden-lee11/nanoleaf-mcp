@@ -109,6 +109,14 @@ def main(argv: list[str] | None = None) -> int:
     ls.add_argument("--meter", action="store_true"); ls.add_argument("--input", help="microphone name/index (default: built-in)")
     rm = sub.add_parser("rhythm-mode"); rm.add_argument("mode", choices=["microphone", "aux"])
 
+    # camera debugger
+    cm = sub.add_parser("camera", help="camera-in-the-loop debugging (needs the 'camera' extra)")
+    cm.add_argument("action", choices=["calibrate", "map", "check", "snap"])
+    cm.add_argument("--camera", type=int, default=0, help="OpenCV camera index (0 = first camera)")
+    cm.add_argument("--brightness", type=int, default=30, help="panel brightness during calibration")
+    cm.add_argument("--scene"); cm.add_argument("--effect"); cm.add_argument("--at", type=float, default=0.0)
+    cm.add_argument("--param", action="append", metavar="KEY=VALUE"); cm.add_argument("--out", help="image path")
+
     # streaming & raw
     sub.add_parser("stream-test", help="stream a short colour sweep over UDP, then restore")
     sub.add_parser("stop-stream")
@@ -215,6 +223,20 @@ def main(argv: list[str] | None = None) -> int:
             except KeyboardInterrupt:
                 print("\nstopped")
         elif a.cmd == "rhythm-mode": _print(nl.set_rhythm_mode(d, a.mode))
+        elif a.cmd == "camera":
+            from . import camera as cam
+            from pathlib import Path
+            if a.action == "snap":
+                c_ = cam.Camera(a.camera); img = c_.grab(frames=3); c_.close()
+                out = a.out or "camera-snap.jpg"; cam._cv2()[0].imwrite(out, img); print("wrote", out)
+            elif a.action == "calibrate":
+                _print(cam.calibrate(nl, d, a.camera, a.brightness))
+            elif a.action == "map":
+                calib = cam.load_calibration(nl, d)
+                _print(cam.fit_layout(nl, d, calib))
+                print("map image:", cam.draw_map(nl, d, calib, Path(a.out or "camera-map.jpg")))
+            elif a.action == "check":
+                _print(cam.check(nl, d, a.scene, a.effect, a.at, _kv(a.param), Path(a.out) if a.out else None))
         elif a.cmd == "stream-test":
             import colorsys
             for dev in nl.targets(d):

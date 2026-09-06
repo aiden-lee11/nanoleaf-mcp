@@ -364,6 +364,32 @@ def sound_trigger_status(device: str = "all") -> dict:
     return nl.sound_trigger_status(device)
 
 
+# ---------------------------------------------------------------- camera debugger
+@mcp.tool()
+def camera_calibrate(device: str, camera: int = 0, brightness: int = 30) -> dict:
+    """Point a webcam at the panels, light each panel alone and locate it in the image. Stores a panel->pixel map used
+    by camera_check. Needs the 'camera' extra and camera permission for the process."""
+    from . import camera as cam
+    return cam.calibrate(nl, device, camera, brightness)
+
+
+@mcp.tool()
+def camera_layout_fit(device: str) -> dict:
+    """Compare the calibrated camera map with the controller's stored layout: reports rotation, mirroring and fit
+    error, i.e. whether the software's idea of 'top' and 'left' matches the wall."""
+    from . import camera as cam
+    return cam.fit_layout(nl, device, cam.load_calibration(nl, device))
+
+
+@mcp.tool()
+def camera_check(device: str, scene: str | None = None, effect: str | None = None, at_s: float = 0.0,
+                 params: dict[str, Any] | None = None) -> dict:
+    """Photograph the panels and compare each one with what the scene/effect should show at at_s: lists mismatched
+    panels (lit vs dark, hue) and writes an annotated image."""
+    from . import camera as cam
+    return cam.check(nl, device, scene, effect, at_s, params)
+
+
 # ---------------------------------------------------------------- rhythm & raw
 @mcp.tool()
 def set_rhythm_mode(mode: str, device: str = "all") -> dict:

@@ -81,33 +81,54 @@ def tennis_rally(geo: Geo, flight_s: float = 2.6, rest_s: float = 0.6):
     return fn, loop
 
 
-@scene("fish", "Fish Swimming", "An aquarium: three fish at their own depths and speeds (one against the current), seaweed and bubbles.",
-       tags=("story", "water"), params={"loop_s": 10.0})
-def fish(geo: Geo, loop_s: float = 10.0):
-    school = [  # (u0, v, seconds per crossing, direction, body, tail)
-        (0.10, 0.70, loop_s, +1, (255, 140, 0), (200, 90, 0)),
-        (0.60, 0.42, loop_s / 2, +1, (255, 220, 40), (190, 150, 20)),
-        (0.30, 0.58, loop_s / 3, -1, (80, 170, 255), (40, 110, 200)),
-    ]
+@scene("fish", "Fish Swimming", "An aquarium: three fish at their own depths and speeds (one against the current) swim panel by panel with a tail one panel behind; seaweed sways along the bottom and bubbles rise.",
+       tags=("story", "water"), params={"loop_s": 12.0}, param_docs={"loop_s": "seconds per loop (fish speeds scale with it)"})
+def fish(geo: Geo, loop_s: float = 12.0):
+    rows = {}
+    for p in geo.panels:
+        rows.setdefault(p.row, []).append(p)
+    for r in rows:
+        rows[r].sort(key=lambda p: p.x)
+    top = geo.nrows - 1
+    lanes = [top if geo.nrows <= 2 else top - 1, max(1, top // 2), 1 if geo.nrows > 1 else 0]
     if geo.nrows == 1:
-        school = [(u0, 0.0, T, d, b, tl) for (u0, _, T, d, b, tl) in school]
+        lanes = [0, 0, 0]
+    # (lane row, panels per loop (crossings), direction, body, tail)
+    school = [(lanes[0], 1, +1, (255, 140, 0), (200, 90, 0)),
+              (lanes[1], 2, +1, (255, 220, 40), (190, 150, 20)),
+              (lanes[2], 3, -1, (80, 170, 255), (40, 110, 200))]
+    plan = []
+    for (row, crossings, d, body, tail) in school:
+        lane = rows.get(row) or rows[min(rows, key=lambda r: abs(r - row))]
+        n = len(lane)
+        period = loop_s / crossings                       # seconds per crossing (including 2 off-screen steps)
+        plan.append((lane, n, period, d, body, tail))
 
-    def where(i, t):
-        u0, v, T, d, *_ = school[i]
-        u = (u0 + d * t / T) % 1.16 - 0.08
-        return u, v + (0.05 * math.sin(2 * math.pi * t / (T / 2) + i) if geo.nrows > 1 else 0.0)
+    def fish_cells(t):
+        out = {}
+        for (lane, n, period, d, body, tail) in plan:
+            k = int((t % period) / period * (n + 2)) - 1  # -1 .. n : one step off each end
+            head = k if d > 0 else n - 1 - k
+            prev = head - d
+            if 0 <= head < n:
+                out.setdefault(lane[head].key, body)
+            if 0 <= prev < n:
+                out.setdefault(lane[prev].key, tail)
+        return out
+
+    bubble_cols = [c for c in range(geo.ncols) if c % 4 == 2]
 
     def fn(t: float, p: Panel):
-        for i, (_, _, T, d, body, tail) in enumerate(school):
-            fu, fv = where(i, t)
-            if p is geo.nearest(fu, fv):
-                return body
-            if 0.03 < fu < 0.97 and p is geo.nearest(fu - d * 0.11, fv):
-                return tail
+        cells = fish_cells(t)
+        if p.key in cells:
+            return cells[p.key]
         if p.row == 0 and geo.nrows > 1 and p.col % 3 == 1:
             return hsb(140, 85, 45 + 20 * math.sin(2 * math.pi * t / 5 + p.col))
-        if p.row > 0 and ((t * 0.45 + p.id * 0.37) % 1.0) < 0.06 and p.col % 4 == 2:
-            return hsb(185, 30, 95)
+        if geo.nrows > 1 and p.col in bubble_cols:
+            # a bubble rises one row every 0.4 s from row 1 to the top, every 4 s, offset per column
+            bt = (t + p.col * 1.3) % 4.0
+            if bt < 0.4 * geo.nrows and int(bt / 0.4) + 1 == p.row:
+                return hsb(185, 30, 95)
         return hsb(205 - 15 * p.v, 90 - 20 * p.v, 22 + 40 * p.v)
     return fn, loop_s
 

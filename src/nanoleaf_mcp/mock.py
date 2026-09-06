@@ -167,8 +167,8 @@ def build_plan_tab(layout_specs: list[str]) -> str:
         plans.append({"title": title, "spec": spec, **_plan_data(pos)})
     cards = "".join(f'''<section class="plan" data-i="{i}">
 <h2>{html.escape(p["title"])}</h2>
-<div class="facts"><div><b>{p["w_cm"]} cm</b> wide × <b>{p["h_cm"]} cm</b> tall</div><div><b>{p["n"]}</b> panels · <b>{p["n"] - 1}</b> linkers · <b>{3 * p["n"]}</b> Command strips</div>
-<div>centre it: opening / wall width <input class="wall" type="number" value="120" min="30" max="600"> cm → start mark <b class="offset"></b> cm in from the left edge, bottom edge on your level line</div></div>
+<div class="facts"><div><b>{p["w_cm"]} cm</b> ({p["w_cm"] / 2.54:.1f} in) wide × <b>{p["h_cm"]} cm</b> ({p["h_cm"] / 2.54:.1f} in) tall</div><div><b>{p["n"]}</b> panels · <b>{p["n"] - 1}</b> linkers · <b>{3 * p["n"]}</b> Command strips</div>
+<div>centre it: opening / wall width <input class="wall" type="number" value="48" min="10" max="400" step="0.5"> <select class="unit"><option value="in" selected>in</option><option value="cm">cm</option></select> → start mark <b class="offset"></b> in from the left edge, bottom edge on your level line</div></div>
 <div class="stage"><svg viewBox="0 0 {p["w"]:.0f} {p["h"]:.0f}" width="{p["w"]:.0f}" height="{p["h"]:.0f}"></svg></div>
 <div class="bar"><button class="prev">◀ Prev</button><button class="play">▶ Play</button><button class="next">Next ▶</button><span class="stepno"></span></div>
 <p class="instr"></p>
@@ -179,8 +179,8 @@ def build_plan_tab(layout_specs: list[str]) -> str:
 <div class="guide">
 <p><b>Before you peel anything.</b> Draw a level line on the wall where the bottom edge of the panels will sit (masking tape works). Mark the start point on it. Lay the whole thing out on the floor first and let the Nanoleaf app's Layout Assistant confirm the shape and the panel count.</p>
 <p><b>Start bottom-left and build in rows.</b> The bottom row is the only straight edge, so it sets everything: put the first panel's base on the level line at the start mark, then work left to right along the bottom row, then each row above, seating every new panel into the notch between the ones below it. Every panel must share an edge with one already mounted so the linker chain stays connected.</p>
-<p><b>Three Command strips per panel, tabs facing out.</b> One strip along each edge, about 2 cm in from it, centred, with the pull tab pointing out past the edge. Press each panel for 30 seconds. Note that on shared edges the tab ends up under the neighbouring panel, so take panels down from the outside in.</p>
-<p><b>Controller and Rhythm module</b> clip onto any outer edge that has a free linker slot; put the controller on the panel nearest the outlet (its cable is about 2.5 m) and the Rhythm module somewhere you can reach. Let the strips cure for an hour before powering up.</p>
+<p><b>Three Command strips per panel, tabs facing out.</b> One strip along each edge, about 2 cm (¾ in) in from it, centred, with the pull tab pointing out past the edge. Press each panel for 30 seconds. Note that on shared edges the tab ends up under the neighbouring panel, so take panels down from the outside in.</p>
+<p><b>Controller and Rhythm module</b> clip onto any outer edge that has a free linker slot; put the controller on the panel nearest the outlet (its cable is about 2.5 m / 8 ft) and the Rhythm module somewhere you can reach. Let the strips cure for an hour before powering up.</p>
 </div>
 {cards}
 </div>
@@ -199,9 +199,9 @@ document.querySelectorAll('.plan').forEach(sec=>{{
     const lbl=(x,y,t,c)=>{{const s=el('text',{{x,y,fill:c||'#9aa',  'font-size':11,'font-family':'Helvetica','text-anchor':'middle'}}); s.textContent=t; svg.appendChild(s);}};
     lbl(f.x1+18,f.y0-6,'level line','#4c8');
     svg.appendChild(el('line',{{x1:f.x0,y1:f.y0+18,x2:f.x1,y2:f.y0+18,stroke:'#777','stroke-width':1}}));
-    lbl((f.x0+f.x1)/2,f.y0+32,P.w_cm+' cm');
+    lbl((f.x0+f.x1)/2,f.y0+32,P.w_cm+' cm  /  '+(P.w_cm/2.54).toFixed(1)+' in');
     svg.appendChild(el('line',{{x1:f.x0-18,y1:f.y0,x2:f.x0-18,y2:f.y1,stroke:'#777','stroke-width':1}}));
-    const vt=el('text',{{x:f.x0-24,y:(f.y0+f.y1)/2,fill:'#9aa','font-size':11,'font-family':'Helvetica','text-anchor':'middle',transform:`rotate(-90 ${{f.x0-24}} ${{(f.y0+f.y1)/2}})`}}); vt.textContent=P.h_cm+' cm'; svg.appendChild(vt);
+    const vt=el('text',{{x:f.x0-24,y:(f.y0+f.y1)/2,fill:'#9aa','font-size':11,'font-family':'Helvetica','text-anchor':'middle',transform:`rotate(-90 ${{f.x0-24}} ${{(f.y0+f.y1)/2}})`}}); vt.textContent=P.h_cm+' cm / '+(P.h_cm/2.54).toFixed(1)+' in'; svg.appendChild(vt);
     P.steps.forEach((s,i)=>{{
       if(i>step) {{ svg.appendChild(el('polygon',{{points:poly(s.verts),fill:'none',stroke:'#2a2a33','stroke-width':1.5,'stroke-dasharray':'3 3'}})); return; }}
       const cur=i===step;
@@ -224,8 +224,10 @@ document.querySelectorAll('.plan').forEach(sec=>{{
   sec.querySelector('.prev').onclick=()=>{{step=Math.max(0,step-1);draw();}};
   sec.querySelector('.next').onclick=()=>{{step=Math.min(P.n-1,step+1);draw();}};
   sec.querySelector('.play').onclick=function(){{ if(timer){{clearInterval(timer);timer=null;this.textContent='▶ Play';return;}} this.textContent='❚❚ Pause'; if(step>=P.n-1) step=0; timer=setInterval(()=>{{ if(step>=P.n-1){{clearInterval(timer);timer=null;sec.querySelector('.play').textContent='▶ Play';return;}} step++; draw(); }},1100); draw(); }};
-  const wall=sec.querySelector('.wall'); const off=sec.querySelector('.offset');
-  const upd=()=>{{ off.textContent=Math.max(0,(+wall.value-P.w_cm)/2).toFixed(1); }}; wall.oninput=upd; upd();
+  const wall=sec.querySelector('.wall'); const off=sec.querySelector('.offset'); const unit=sec.querySelector('.unit');
+  const upd=()=>{{ const cm=unit.value==='in'?+wall.value*2.54:+wall.value; const o=Math.max(0,(cm-P.w_cm)/2);
+    off.textContent=`${{(o/2.54).toFixed(1)}} in (${{o.toFixed(1)}} cm)`; }};
+  wall.oninput=upd; unit.onchange=()=>{{ wall.value=unit.value==='in'?(+wall.value/2.54).toFixed(1):(+wall.value*2.54).toFixed(1); upd(); }}; upd();
   draw();
 }});
 </script>'''

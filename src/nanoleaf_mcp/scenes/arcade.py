@@ -107,7 +107,7 @@ def breakout(geo: Geo, seed: int = 1):
         return frame
 
     frames, loop = _precompute_clean(dt, step, state, keys=("won",), min_s=10.0, max_s=40.0)
-    return _player(frames, dt, loop, lambda t, p: hsb(230, 60, 3)), loop
+    return _player(frames, dt, loop, lambda t, p: (0, 0, 0)), loop
 
 
 # ---------------------------------------------------------------- frogger -----------------------------------
@@ -177,7 +177,7 @@ def frogger(geo: Geo, seed: int = 2):
 
     loop = 30.0
     frames = _precompute(loop, dt, step)
-    return _player(frames, dt, loop, lambda t, p: hsb(0, 0, 4)), loop
+    return _player(frames, dt, loop, lambda t, p: (0, 0, 0)), loop
 
 
 # ---------------------------------------------------------------- asteroids ---------------------------------
@@ -336,7 +336,7 @@ def tetris(geo: Geo, seed: int = 5, fall_s: float = 0.3):
         return frame
 
     frames, loop = _precompute_clean(dt, step, state, keys=("over",), min_s=10.0, max_s=45.0)
-    return _player(frames, dt, loop, lambda t, p: hsb(230, 50, 4)), loop
+    return _player(frames, dt, loop, lambda t, p: (0, 0, 0)), loop
 
 
 # ---------------------------------------------------------------- mario -------------------------------------
@@ -407,7 +407,7 @@ def bricks_balls(geo: Geo, seed: int = 6, balls: int = 6):
              "flash": {}, "over": None}
 
     def durability_colour(hits):                  # grey bricks: the more hits left, the brighter
-        return hsb(215, 35, [32, 46, 62, 78, 94][min(4, hits - 1)])
+        return hsb(215, 22, [34, 48, 63, 79, 95][min(4, hits - 1)])
 
     def new_row():
         row = {}
@@ -483,7 +483,7 @@ def bricks_balls(geo: Geo, seed: int = 6, balls: int = 6):
         return frame
 
     frames, loop = _precompute_clean(dt, step, state, keys=("over",), min_s=10.0, max_s=45.0)
-    return _player(frames, dt, loop, lambda t, p: hsb(230, 40, 4)), loop
+    return _player(frames, dt, loop, lambda t, p: (0, 0, 0)), loop
 
 
 # ---------------------------------------------------------------- fruit ninja -------------------------------

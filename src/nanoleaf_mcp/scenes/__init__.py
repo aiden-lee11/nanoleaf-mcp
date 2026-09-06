@@ -331,14 +331,22 @@ def sample_keyframes(geo: Geo, fn: SceneFn, duration_s: float, step_tenths: int 
     out: dict[str, dict[int, list[dict]]] = {}
     q = max(1, quant)
     for p in geo.panels:
-        seq = out.setdefault(p.device, {}).setdefault(p.id, [])
+        runs: list[list] = []                      # [colour, ticks] for each run of identical colour
         for k in range(steps):
             r, g, b = to_rgb(fn(k * step_tenths / 10, p))
             col = f"rgb({int(round(r / q)) * q},{int(round(g / q)) * q},{int(round(b / q)) * q})"
-            if seq and seq[-1]["color"] == col:
-                seq[-1]["transition"] += step_tenths
+            if runs and runs[-1][0] == col:
+                runs[-1][1] += step_tenths
             else:
-                seq.append({"color": col, "transition": step_tenths})
+                runs.append([col, step_tenths])
+        # A keyframe's time is how long the panel takes to FADE INTO its colour. So a run of N ticks becomes a quick
+        # fade in (one tick) followed by a hold (a keyframe of the same colour lasting the rest); one keyframe with
+        # the whole run length would smear every change into a slow fade.
+        seq = out.setdefault(p.device, {}).setdefault(p.id, [])
+        for col, ticks in runs:
+            seq.append({"color": col, "transition": step_tenths})
+            if ticks > step_tenths:
+                seq.append({"color": col, "transition": ticks - step_tenths})
     return out
 
 

@@ -28,6 +28,8 @@ from .render import render as _render, render_svg as _render_svg, anim_data_colo
 
 log = logging.getLogger("nanoleaf")
 
+MAX_STORED_EFFECTS = 50   # Light Panels firmware 5.x rejects the 51st stored effect with a bare HTTP 400
+
 DESKTOP_APP_DATA = Path.home() / "Library/Application Support/Nanoleaf Desktop/appData.json"
 
 
@@ -641,13 +643,23 @@ class Nanoleaf:
         """Add (or replace) an effect without changing what is showing. Firmware 5.x switches to a freshly
         added effect, so the previous display is put back afterwards."""
         name = body["animName"]
-        existing = _match_name(c.effects_list(), name, exact=True)
+        names = c.effects_list()
+        existing = _match_name(names, name, exact=True)
         before = self.snapshot(dev, c)
         if existing:
             if before.get("effect") == existing:
                 c.select_effect(existing)  # will be replaced below; keep it selected afterwards
             c.delete_effect(existing)
-        c.add_effect(body)
+        elif len(names) >= MAX_STORED_EFFECTS:
+            raise NanoleafError(f"{dev.label} already stores {len(names)} effects, the controller's limit is {MAX_STORED_EFFECTS}; "
+                                f"delete some (delete_effect) before saving {name!r}", 400)
+        try:
+            c.add_effect(body)
+        except NanoleafError as e:
+            if e.status == 400 and len(names) >= MAX_STORED_EFFECTS - 1:
+                raise NanoleafError(f"{dev.label} refused the effect; it stores {len(names)} effects and the controller's limit is "
+                                    f"{MAX_STORED_EFFECTS}. Delete some with delete_effect and retry.", 400) from e
+            raise
         res: dict[str, Any] = {"saved": name}
         if before.get("effect") == existing and existing:
             c.select_effect(name)

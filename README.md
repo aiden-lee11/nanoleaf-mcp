@@ -124,6 +124,14 @@ uv run nanoleaf listen --effect "Rocket Launch" --meter     # or start_sound_tri
 
 If you want music reactivity with no computer, use a rhythm plugin (`apply_preset purple_red_pulse`).
 
+## Limits worth knowing
+
+* A Light Panels controller stores at most **50 effects**; the 51st `add` fails with a bare HTTP 400. `save_scene`
+  reports this clearly; delete old effects to make room.
+* Keyframe animations: a keyframe's time is the fade *into* its colour, so the sampler emits a quick fade plus a hold
+  for every colour change (otherwise every change smears into a slow fade).
+* Controllers stall for a few seconds after mode changes; the client retries timed-out requests.
+
 ## How it works
 
 * `discovery.py`: mDNS browse (`_nanoleafapi._tcp`; Apple `dns-sd` on macOS, python-zeroconf elsewhere).

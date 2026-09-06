@@ -394,19 +394,69 @@ def mario(geo: Geo, speed: float = 2.5):
 
 
 # ---------------------------------------------------------------- bricks and balls --------------------------
-@scene("bricks_balls", "Bricks and Balls", "The mobile brick-breaker: grey bricks (brighter = more hits left) creep down a row each turn, a stream of red balls fired from the bottom ricochets off the walls chipping them down until they shatter; lose when a brick reaches the floor.",
+def _tri_verts(p):
+    """Triangle vertices of a panel from its centroid and orientation (layout units)."""
+    from . import H, HALF
+    if p.up:
+        return [(p.x, p.y + 2 * H / 3), (p.x - HALF, p.y - H / 3), (p.x + HALF, p.y - H / 3)]
+    return [(p.x, p.y - 2 * H / 3), (p.x - HALF, p.y + H / 3), (p.x + HALF, p.y + H / 3)]
+
+
+def _inside(pt, verts):
+    (x, y), (x1, y1), (x2, y2), (x3, y3) = pt, *verts
+    d1 = (x - x2) * (y1 - y2) - (x1 - x2) * (y - y2)
+    d2 = (x - x3) * (y2 - y3) - (x2 - x3) * (y - y3)
+    d3 = (x - x1) * (y3 - y1) - (x3 - x1) * (y - y1)
+    return not ((d1 < 0 or d2 < 0 or d3 < 0) and (d1 > 0 or d2 > 0 or d3 > 0))
+
+
+def _crossed_edge(p0, p1, verts):
+    """Which edge (a, b) of the triangle the segment p0->p1 crosses (or the closest edge to p1 if none)."""
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    edges = list(zip(verts, verts[1:] + verts[:1]))
+    for a, b in edges:
+        if (cross(p0, p1, a) > 0) != (cross(p0, p1, b) > 0) and (cross(a, b, p0) > 0) != (cross(a, b, p1) > 0):
+            return a, b
+    def dist(e):
+        (ax, ay), (bx, by) = e
+        dx, dy = bx - ax, by - ay
+        t = max(0.0, min(1.0, ((p1[0] - ax) * dx + (p1[1] - ay) * dy) / (dx * dx + dy * dy)))
+        return math.hypot(p1[0] - (ax + t * dx), p1[1] - (ay + t * dy))
+    return min(edges, key=dist)
+
+
+def _reflect(vx, vy, edge):
+    (ax, ay), (bx, by) = edge
+    ex, ey = bx - ax, by - ay
+    n = math.hypot(ex, ey); ex, ey = ex / n, ey / n
+    d = vx * ex + vy * ey
+    return 2 * d * ex - vx, 2 * d * ey - vy
+
+
+@scene("bricks_balls", "Bricks and Balls", "The mobile brick-breaker: grey bricks (brighter = more hits left) creep down a row each turn, a stream of red balls fired from the bottom ricochets off the walls and the bricks' real edges, chipping them down until they shatter; lose when a brick reaches the floor.",
        tags=("game", "mobile"), params={"seed": 6, "balls": 6}, param_docs={"balls": "balls per volley"}, min_rows=3)
 def bricks_balls(geo: Geo, seed: int = 6, balls: int = 6):
+    from . import H, HALF
     dt = 0.05
     rng = random.Random(seed)
     W, Hh = geo.ncols, geo.nrows
-    from . import H
-    rows_w, rows_h = geo.w / H, geo.h / H
+    verts = {p.key: _tri_verts(p) for p in geo.panels}
+    all_v = [v for vs in verts.values() for v in vs]
+    y_floor = min(v[1] for v in all_v)
+    SPEED = 2.4 * 150                                 # layout units per second (~2.4 panel widths)
+
+    def panel_at(pt):
+        for p in geo.panels:
+            if _inside(pt, verts[p.key]):
+                return p
+        return None
+
     level = {"n": 1}
-    state = {"bricks": {}, "balls": [], "phase": "aim", "phase_t": 0.0, "launch_u": 0.5, "angle": 1.2, "fired": 0,
+    state = {"bricks": {}, "balls": [], "phase": "aim", "phase_t": 0.0, "launcher": None, "angle": 1.2, "fired": 0,
              "flash": {}, "over": None}
 
-    def durability_colour(hits):                  # grey bricks: the more hits left, the brighter
+    def durability_colour(hits):
         return hsb(215, 22, [34, 48, 63, 79, 95][min(4, hits - 1)])
 
     def new_row():
@@ -418,26 +468,23 @@ def bricks_balls(geo: Geo, seed: int = 6, balls: int = 6):
         return row
 
     def descend():
-        moved = {}
-        for (r, c), hits in state["bricks"].items():
-            moved[(r - 1, c)] = hits
-        state["bricks"] = moved
+        state["bricks"] = {(r - 1, c): h for (r, c), h in state["bricks"].items()}
         state["bricks"].update(new_row())
         level["n"] += 1
 
-    state["bricks"] = new_row(); descend()
+    def reset():
+        state.update(bricks={}, balls=[], phase="aim", fired=0); level["n"] = 1
+        state["bricks"] = new_row(); descend()
+        state["launcher"] = min((p for p in geo.panels if p.row == 0), key=lambda p: abs(p.u - 0.5))
 
-    def cell(u, v):
-        p = geo.nearest(max(0.0, min(1.0, u)), max(0.0, min(1.0, v)))
-        return (p.row, p.col)
+    reset()
 
     def step(t):
         s = state
         frame = {}
         if s["over"] is not None:
             if t - s["over"] > 1.5:
-                s.update(bricks={}, balls=[], phase="aim", phase_t=t, over=None); level["n"] = 1
-                s["bricks"] = new_row(); descend()
+                reset(); s["over"] = None; s["phase_t"] = t
             elif int((t - s["over"]) / 0.2) % 2 == 0:
                 return {c: (255, 80, 80) for c in geo.cells}
         for c, hits in s["bricks"].items():
@@ -445,41 +492,56 @@ def bricks_balls(geo: Geo, seed: int = 6, balls: int = 6):
         for c, t0 in list(s["flash"].items()):
             if t - t0 < 0.15: frame[c] = (255, 200, 200)
             else: del s["flash"][c]
+        L = s["launcher"]
         if s["phase"] == "aim":
             if t - s["phase_t"] > 0.6:
-                targets = [(c, h) for c, h in s["bricks"].items() if c in geo.cells]
+                targets = [(geo.by_cell[c], h) for c, h in s["bricks"].items() if c in geo.by_cell]
                 if targets:
-                    tc = max(targets, key=lambda ch: ch[1] * 10 - ch[0][0])[0]
-                    tu, tv = tc[1] / max(1, W - 1), tc[0] / max(1, Hh - 1)
-                    s["angle"] = math.atan2(max(0.2, tv - 0.0), (tu - s["launch_u"]) + rng.uniform(-0.15, 0.15))
+                    tp = max(targets, key=lambda ph: ph[1] * 10 - ph[0].row)[0]
+                    ang = math.atan2(tp.y - L.y, tp.x - L.x) + rng.uniform(-0.25, 0.25)
+                else:
+                    ang = rng.uniform(0.6, 2.5)
+                s["angle"] = max(0.35, min(math.pi - 0.35, ang))     # always upward, never along the floor
                 s["phase"], s["phase_t"], s["fired"], s["balls"] = "fire", t, 0, []
         if s["phase"] == "fire":
             if s["fired"] < balls and t - s["phase_t"] >= s["fired"] * 0.12:
-                s["balls"].append({"u": s["launch_u"], "v": 0.02, "du": math.cos(s["angle"]) * 0.9, "dv": math.sin(s["angle"]) * 0.9, "home": False})
+                s["balls"].append({"x": L.x, "y": L.y, "vx": math.cos(s["angle"]) * SPEED, "vy": math.sin(s["angle"]) * SPEED, "home": False})
                 s["fired"] += 1
             for b in s["balls"]:
-                if b["home"]: continue
-                b["u"] += b["du"] * dt; b["v"] += b["dv"] * dt
-                if b["u"] < 0: b["u"], b["du"] = -b["u"], abs(b["du"])
-                if b["u"] > 1: b["u"], b["du"] = 2 - b["u"], -abs(b["du"])
-                if b["v"] > 1: b["v"], b["dv"] = 2 - b["v"], -abs(b["dv"])
-                bc = cell(b["u"], b["v"])
-                if bc in s["bricks"]:
-                    s["bricks"][bc] -= 1; s["flash"][bc] = t
-                    if s["bricks"][bc] <= 0: del s["bricks"][bc]
-                    b["dv"] = -b["dv"]; b["v"] += b["dv"] * dt * 2
-                if b["v"] <= 0:
-                    b["home"] = True; b["v"] = 0.0
+                if b["home"]:
+                    continue
+                for _ in range(3):                    # up to three bounces per tick
+                    nx, ny = b["x"] + b["vx"] * dt, b["y"] + b["vy"] * dt
+                    here = panel_at((b["x"], b["y"]))
+                    there = panel_at((nx, ny))
+                    if there is not None and (there.row, there.col) in s["bricks"]:
+                        cell = (there.row, there.col)
+                        s["bricks"][cell] -= 1; s["flash"][cell] = t
+                        if s["bricks"][cell] <= 0: del s["bricks"][cell]
+                        edge = _crossed_edge((b["x"], b["y"]), (nx, ny), verts[there.key])
+                        b["vx"], b["vy"] = _reflect(b["vx"], b["vy"], edge)
+                        continue
+                    if there is None:                 # leaving the panel shape: bounce off the edge just crossed
+                        if here is None:
+                            b["home"] = True; break
+                        edge = _crossed_edge((b["x"], b["y"]), (nx, ny), verts[here.key])
+                        (ax, ay), (bx, by) = edge
+                        if abs(ay - by) < 1 and abs(ay - y_floor) < 1:      # the floor: the ball comes home
+                            b["home"] = True; break
+                        b["vx"], b["vy"] = _reflect(b["vx"], b["vy"], edge)
+                        continue
+                    b["x"], b["y"] = nx, ny
+                    break
             if s["fired"] >= balls and all(b["home"] for b in s["balls"]):
-                s["launch_u"] = s["balls"][0]["u"] if s["balls"] else 0.5
                 descend()
                 if any(r <= 0 for (r, _) in s["bricks"]):
                     s["over"] = t
                 s["phase"], s["phase_t"] = "aim", t
         for b in s["balls"]:
             if not b["home"]:
-                frame[cell(b["u"], b["v"])] = (255, 40, 40)
-        frame[cell(s["launch_u"], 0.0)] = (160, 20, 20)
+                p = panel_at((b["x"], b["y"]))
+                if p is not None: frame[(p.row, p.col)] = (255, 40, 40)
+        frame[(L.row, L.col)] = (160, 20, 20)
         return frame
 
     frames, loop = _precompute_clean(dt, step, state, keys=("over",), min_s=10.0, max_s=45.0)

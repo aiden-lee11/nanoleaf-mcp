@@ -69,6 +69,7 @@ Built in (`uv run nanoleaf scenes`):
 | ambient | `ember_fire`, `fireplace`, `ocean_wave`, `crashing_wave`, `sleepy_wave` (a slow dim swell for bedtime), `ombre` (a ring of your colours scrolling and wrapping), `rainbow`, `breathe` (bedtime) |
 | motion | `shooting_star`, `rocket_launch` (one-shot with countdown), `rain` |
 | stories | `bunny_hop`, `tennis_rally`, `fish` |
+| places | `multnomah_falls` (a two-tier waterfall with a bridge across it, mist over the pool) |
 | games | `snake` (follows real panel adjacency, with get-ready, victory sweep and crash states), `pong`, `space_shooter` |
 | static designs | `gem_mosaic`, `spectrum_facets` |
 

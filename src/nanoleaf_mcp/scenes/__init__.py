@@ -289,7 +289,7 @@ def scene(name: str, title: str, description: str, *, tags: tuple[str, ...] = ()
 
 
 def _load_builtin() -> None:
-    for mod in ("ambient", "motion", "story", "games", "arcade", "static"):
+    for mod in ("ambient", "motion", "story", "games", "arcade", "static", "places"):
         importlib.import_module(f"{__name__}.{mod}")
 
 

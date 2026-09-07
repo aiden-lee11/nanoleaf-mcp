@@ -6,9 +6,10 @@ import math
 from . import Geo, Panel, hsb, mix, scene, tri
 
 
-@scene("bunny_hop", "Bunny Hop", "A white bunny hops panel by panel along the top of the grass and back: grass below (never covered), sky above, a cloud and a sun.",
-       tags=("story", "cute"), params={"hop_s": 1.1}, param_docs={"hop_s": "seconds per hop"})
-def bunny_hop(geo: Geo, hop_s: float = 1.1):
+@scene("bunny_hop", "Bunny Hop", "A white bunny hops panel by panel along the top of the grass and back; the field scrolls under it like a side-scroller (never covered by the bunny), sky above, a sun, and optionally a cloud in the top-left corner.",
+       tags=("story", "cute"), params={"hop_s": 1.1, "cloud": False},
+       param_docs={"hop_s": "seconds per hop", "cloud": "light a pale cloud in the top-left corner"})
+def bunny_hop(geo: Geo, hop_s: float = 1.1, cloud: bool = False):
     top_row = geo.nrows - 1
     grass = 0 if geo.nrows > 1 else -1
     ground_row = 1 if geo.nrows > 1 else 0
@@ -24,6 +25,12 @@ def bunny_hop(geo: Geo, hop_s: float = 1.1):
             return None
         mx = (a.x + b.x) / 2
         return min(air, key=lambda p: abs(p.x - mx))
+
+    def scroll(t):
+        """Field offset in grass columns: the ground slides left while the bunny heads right and back again on the
+        return leg (two steps per hop), so the pattern is where it started when the loop wraps."""
+        steps = int((t % loop) / (hop_s / 2))       # 0 .. 4*hops-1
+        return steps if steps < 2 * hops else 4 * hops - steps
 
     def state(t):
         """(current panel, previous ground panel) for the hop timeline: there and back."""
@@ -47,13 +54,12 @@ def bunny_hop(geo: Geo, hop_s: float = 1.1):
             return (255, 250, 235)
         if p is before:
             return mix((90, 160, 255) if p.row != grass else (70, 150, 80), (255, 250, 235), 0.35)
-        if p.row == grass:
-            return hsb(125, 75, 55 if p.col % 2 else 68)
-        if geo.nrows == 1:
-            return hsb(125, 75, 45 if p.col % 2 else 60)
+        if p.row == grass or geo.nrows == 1:
+            tuft = (p.col + scroll(t)) % 3 == 0     # a bright tuft every third panel, sliding with the field
+            return hsb(105, 65, 88) if tuft else hsb(125, 75, 50)
         if p.row == top_row and p.col >= geo.ncols - 2:
             return hsb(45, 90, 100)
-        if p.row == top_row and p.col <= 1:
+        if cloud and p.row == top_row and p.col <= 1:
             return hsb(205, 12, 92)
         return hsb(208, 70 - 15 * p.v, 78 + 18 * p.v)
     return fn, loop

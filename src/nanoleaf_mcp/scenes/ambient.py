@@ -146,3 +146,34 @@ def sweep(geo: Geo, period_s: float = 3.0):
     def fn(t: float, p: Panel):
         return hsb(((p.u - t / period_s) % 1.0) * 360, 100, 100)
     return fn, period_s
+
+
+@scene("sleepy_wave", "Sleepy Wave", "A slow, dim swell rolling left to right through every row: the water surface rises to the top "
+       "at the crest and sinks into the trough behind it, deep water darker below, a faint pale crest, black sky above. For bedtime.",
+       tags=("ambient", "water", "bedtime"), params={"period_s": 10.0, "brightness": 65},
+       param_docs={"period_s": "seconds per wave pass", "brightness": "peak panel brightness 0-100 (keep it low for sleep)"})
+def sleepy_wave(geo: Geo, period_s: float = 10.0, brightness: float = 65):
+    wavelength = geo.w * 1.25
+    peak = max(5.0, min(100.0, float(brightness)))
+    band = 0.28                                             # how softly the surface fades through a row
+    rows = max(1, geo.nrows - 1)
+
+    def fn(t: float, p: Panel):
+        v = p.row / rows                                    # by row, so up/down neighbours match
+        phase = ((p.x - geo.x0) / wavelength - t / period_s) % 1.0
+        swell = 0.5 * (1 + math.cos(2 * math.pi * phase))   # 1 at the crest, 0 in the trough
+        surface = 0.38 + 0.72 * swell                       # water level (0 bottom row .. 1 top row)
+        lit = max(0.0, min(1.0, (surface - v) / band + 0.5))
+        if lit <= 0.02:
+            return (0, 0, 0)                                # night sky
+        depth = 1 - v                                       # deeper water is darker and bluer
+        hue = 212 + 14 * depth
+        sat = 80 + 15 * depth
+        bri = peak * (0.28 + 0.72 * (1 - depth) ** 1.3) * lit
+        near = math.exp(-((surface - v) / 0.22) ** 2)        # panels right at the surface
+        crest = swell ** 3 * near
+        if crest > 0:
+            hue, sat = hue - 18 * crest, sat * (1 - 0.55 * crest)
+            bri = bri + (peak - bri) * 0.35 * crest
+        return hsb(hue, sat, bri)
+    return fn, period_s

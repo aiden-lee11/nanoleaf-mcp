@@ -134,7 +134,7 @@ PIXEL_ART: dict[str, dict] = {
     "bolt": {"title": "Lightning Bolt", "cells": {c: "#ffe600" for c in
         [(3, 5), (3, 6), (2, 4), (2, 5), (1, 2), (1, 3), (1, 4), (1, 5), (0, 3)]}},
     "mountains": {"title": "Mountains and Sun", "cells": {
-        (3, 1): "#ffffff", (3, 5): "#ffffff", (3, 3): "#ffb300",                       # snow peaks, sun
+        (3, 1): "#ffffff", (3, 5): "#ffffff", (3, 7): "#ffb300",                       # snow peaks, sun in the top-right corner
         (2, 0): "#6e7b8b", (2, 1): "#6e7b8b", (2, 2): "#6e7b8b", (2, 4): "#6e7b8b", (2, 5): "#6e7b8b", (2, 6): "#6e7b8b",
         (2, 3): "#3a4452",
         **{(1, c): "#2e7d32" for c in range(0, 8)}, **{(0, c): "#1b5e20" for c in range(1, 8)}}},
